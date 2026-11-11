@@ -1,0 +1,43 @@
+{
+  "passed": [
+    "NAS identity login and token-only requests",
+    "20px icon slots and common navigation text origin",
+    "invalid MAC feedback and add device",
+    "edit device and escaped user-provided text",
+    "delete cancellation and confirmation",
+    "expired token refreshed",
+    "wake progress, success, duplicate prevention across refresh",
+    "failed wake and detailed history",
+    "guide and remote streaming scenario",
+    "devices, history, guide without overflow at 320/390/768/1024/1280",
+    "mobile dialog and 44px action targets",
+    "long names and invalid interface feedback",
+    "long and short device names keep wake buttons aligned",
+    "empty list state",
+    "ordinary user denied, missing identity denied, retry recovery",
+    "standalone requires UGOS context"
+  ],
+  "alignment": [
+    {
+      "x": 28,
+      "w": 20,
+      "h": 20,
+      "textX": 60
+    },
+    {
+      "x": 28,
+      "w": 20,
+      "h": 20,
+      "textX": 60
+    },
+    {
+      "x": 28,
+      "w": 20,
+      "h": 20,
+      "textX": 60
+    }
+  ],
+  "pageErrors": [],
+  "assetErrors": [],
+  "sdk": "mocked SDK and API; no real WOL packets sent"
+}

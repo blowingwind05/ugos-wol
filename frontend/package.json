@@ -1,0 +1,9 @@
+{
+  "name": "ugos-wol-ui",
+  "private": true,
+  "version": "0.2.4",
+  "type": "module",
+  "scripts": {"build": "node build.mjs"},
+  "dependencies": {"@ugreen-nas/core": "1.7.42"},
+  "devDependencies": {"esbuild": "0.28.2"}
+}
