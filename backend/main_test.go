@@ -56,7 +56,7 @@ func call(t *testing.T, a *App, method, path, body, identity string) (int, []byt
 }
 func add(t *testing.T, a *App) Device {
 	t.Helper()
-	status, body := call(t, a, "POST", "devices", `{"name":"笔记本","mac":"02-AB-CD-EF-12-34","network":"auto"}`, testIdentity)
+	status, body := call(t, a, "POST", "devices", `{"name":"设备 A","mac":"02-AB-CD-EF-12-34","network":"auto"}`, testIdentity)
 	if status != 200 {
 		t.Fatalf("add: %d %s", status, body)
 	}
@@ -110,6 +110,28 @@ func TestRejectInvalidMACs(t *testing.T) {
 	for _, s := range []string{"bad", "FF:FF:FF:FF:FF:FF", "00:00:00:00:00:00", "01:00:5E:00:00:01", "00:11:22:33:44:55:66:77"} {
 		if _, _, err := magicPacket(s); err == nil {
 			t.Errorf("accepted %q", s)
+		}
+	}
+}
+
+func TestLANInterfaceSelectionAcrossNetworkSetups(t *testing.T) {
+	flags := net.FlagUp | net.FlagBroadcast
+	for _, name := range []string{"eth0", "enp3s0", "bond0", "br0", "br-lan", "br-office-net", "enp3s0.20"} {
+		if !usableLANInterface(net.Interface{Name: name, Flags: flags}) {
+			t.Errorf("LAN interface %q was excluded", name)
+		}
+	}
+	for _, nic := range []net.Interface{
+		{Name: "lo", Flags: flags | net.FlagLoopback},
+		{Name: "eth1", Flags: net.FlagBroadcast},
+		{Name: "tailscale0", Flags: net.FlagUp | net.FlagPointToPoint},
+		{Name: "docker0", Flags: flags},
+		{Name: "veth1234", Flags: flags},
+		{Name: "virbr0", Flags: flags},
+		{Name: "br-012345abcdef", Flags: flags},
+	} {
+		if usableLANInterface(nic) {
+			t.Errorf("non-LAN interface %q was accepted", nic.Name)
 		}
 	}
 }
@@ -175,6 +197,9 @@ func TestDeviceLifecyclePersistsAndWakeCooldown(t *testing.T) {
 	if status != 200 || !bytes.Contains(body, []byte(`"sent":3`)) {
 		t.Fatalf("wake: %d %s", status, body)
 	}
+	if !bytes.Contains(body, []byte("目标设备")) || bytes.Contains(body, []byte("笔记本")) {
+		t.Fatal("wake result must describe a generic target device")
+	}
 	if status, _ := call(t, a, "POST", "wake/"+d.ID, `{}`, testIdentity); status != 429 {
 		t.Fatal(status)
 	}
@@ -198,10 +223,10 @@ func TestDeviceLifecyclePersistsAndWakeCooldown(t *testing.T) {
 func TestDestinationAndInputValidation(t *testing.T) {
 	a := fixture(t)
 	for _, body := range []string{
-		`{"name":"laptop","mac":"02:AB:CD:EF:12:34","network":"8.8.8.8"}`,
+		`{"name":"target-device","mac":"02:AB:CD:EF:12:34","network":"8.8.8.8"}`,
 		`{"name":"","mac":"02:AB:CD:EF:12:34","network":"auto"}`,
-		`{"name":"laptop","mac":"02:AB:CD:EF:12:34","network":"auto","command":"whoami"}`,
-		`{"name":"laptop","mac":"02:AB:CD:EF:12:34","network":"auto"} {}`,
+		`{"name":"target-device","mac":"02:AB:CD:EF:12:34","network":"auto","command":"whoami"}`,
+		`{"name":"target-device","mac":"02:AB:CD:EF:12:34","network":"auto"} {}`,
 	} {
 		if status, _ := call(t, a, "POST", "devices", body, testIdentity); status != 400 {
 			t.Errorf("%d %s", status, body)

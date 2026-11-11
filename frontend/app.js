@@ -52,9 +52,10 @@ function sessionFailed(error) {
   connected = false; thirdToken = '';
   for (const id of ['device-dialog','delete-dialog']) if ($(id).open) $(id).close();
   $('app').hidden = true; $('session-screen').hidden = false;
-  $('session-title').textContent = '无法连接 NAS';
+  const denied = error.status === 403;
+  $('session-title').textContent = denied ? '无权访问' : error.status === 401 ? '需要重新验证身份' : '无法打开远程唤醒';
   $('session-message').textContent = error.message;
-  $('retry-session').hidden = false;
+  $('retry-session').hidden = denied;
 }
 async function handle(action) { try { await action(); } catch (error) { if (error.status === 401 || error.status === 403) sessionFailed(error); message(error.message,true); } }
 async function startSession() {
@@ -111,7 +112,7 @@ function render() {
     const row = text('article','',`event${!event.sent ? ' failed' : ''}`);
     row.classList.toggle('failed',!event.sent || Boolean(event.error));
     const device = text('div','','event-device'), identity = document.createElement('div');
-    identity.append(text('h3',event.name),text('p',event.mac,'event-mac mono')); device.append(icon('desktop'),identity);
+    identity.append(text('h3',event.name),text('p',event.mac,'event-mac mono')); device.append(icon('iot'),identity);
     const status = text('div','','event-status'); status.append(icon(event.sent && !event.error ? 'checkmark_circle' : 'warning'),document.createTextNode(event.sent ? event.error ? '部分发送' : '已发送' : '发送失败'));
     const time = text('time',formatTime(event.time),'event-time'); time.dateTime = event.time;
     const actor = text('div',event.actor ? event.actor.name : '旧版记录 · 未记录','event-actor'); actor.title = event.actor ? `操作人：${event.actor.name}` : '旧版记录 · 未记录操作人';

@@ -10,3 +10,5 @@ footer{display:flex;align-items:center;justify-content:space-between;gap:12px;wi
 @media(max-width:700px){.page-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.page-heading>div:first-child{display:contents}.page-heading>div:first-child>p{grid-column:1/-1;grid-row:2;margin-top:0}.page-heading>.toolbar{grid-column:2;grid-row:1;margin-left:0}.page-heading .title-line{grid-column:1;grid-row:1}.title-line{white-space:nowrap}}
 @media(max-width:360px){.title-line .count{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.platform-help{margin-top:12px}.platform-help summary{color:var(--accent);cursor:pointer;font-size:13px;line-height:1.7}.platform-help p strong{font-weight:600;color:#424242}

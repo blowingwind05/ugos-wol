@@ -1,118 +1,147 @@
-# 远程唤醒 · UGOS WOL
+# ugos-wol
 
-当前工作副本仍为 **0.2.4**，包含恢复左上角标题、左下角仅显示版本号和缩小底边距的调整；这些调整尚未重新打包，现有 `0.2.4.0001` 安装包不包含它们。
+**简体中文** | [English](README.en.md)
 
-面向绿联 UGOS Pro 的 x86_64（amd64）原生应用。利用绿联远程访问，以 NAS 为中继，从外网唤醒家中的电脑。本应用通过 NAS 发送 WOL（网络唤醒）魔术包，唤醒与 NAS 同一局域网内的兼容设备。电脑启动后，可搭配已配置好的 UU 远程或 Sunshine + Moonlight，进行远程办公与游戏串流。本应用不用于唤醒 NAS 本身。 **不需要目标设备的 IP 地址，只需要网卡 MAC。**
+<img src="frontend/icon.svg" alt="远程唤醒图标" width="80" height="80" align="right">
 
-包含中文桌面/手机界面、设备管理、网段自动识别、发送接口选择、一键唤醒、最近 100 条发送记录。采用 Go 静态可执行程序，无需 Docker、Python 或 Node.js 运行环境。
+通过绿联 NAS 唤醒局域网内支持 **Wake-on-LAN（WOL）** 的设备。
 
-## 使用场景
+复用绿联 NAS 已有的远程访问能力：在外通过绿联客户端打开应用，由 NAS 在局域网内发送标准魔术包。对于已经能够远程访问 NAS 的用户，无需为 WOL 额外申请公网 IP、配置端口映射或部署内网穿透服务，也无需单独准备一台唤醒中继设备。[绿联原生应用远程访问说明](https://developer.ugnas.com/doc/backend/application/app-port.html)
 
-出门在外需要使用家中电脑时：
+目标可以是工作站、服务器、网络存储或其他支持 WOL 的设备；本应用不用于唤醒承载它的 NAS。NAS 需要保持运行，目标设备仍需完成硬件与系统的 WOL 设置。
 
-1. 通过绿联远程访问，打开 NAS 上的「远程唤醒」。
-2. 由 NAS 向局域网内的目标设备发送 WOL 魔术包，等待电脑启动。
-3. 使用已配置好的 UU 远程，或 Sunshine（电脑端）+ Moonlight（客户端），连接电脑进行远程办公或游戏串流。
+## 方案优势对比
 
-本应用负责由 NAS 发出唤醒包；远程控制或串流连接由对应软件提供，其网络访问需预先配置。
-Sunshine 与 Moonlight 的配合方式见 [Sunshine 官方说明](https://docs.lizardbyte.dev/projects/sunshine/latest/)。
+**让本来就常开的 NAS，成为远程唤醒的入口。** NAS 通常已经持续运行并接入局域网，适合代替另一台常开电脑承担 WOL 发包。ugos-wol 将这项能力做成 UGOS 原生应用，复用绿联 NAS 的登录账号、远程通道和手机入口。[绿联原生应用远程访问说明](https://developer.ugnas.com/doc/backend/application/app-port.html)
+
+在绿联客户端里，打开“远程唤醒”、选择设备即可发起唤醒。无需为 WOL 另留一台电脑或购买开机棒，也无需自行部署网页服务、记住 IP 和端口、配置域名或单独搭建外网访问通道。
+
+下面以“已有绿联 NAS，人在外网唤醒局域网设备”为场景，比较常驻设备的利用、日常操作入口，以及需要额外承担的配置。
+
+| 方案 | 发包设备 | 手机操作入口 | 配置与使用门槛 |
+| --- | --- | --- | --- |
+| **ugos-wol** | **本来就常开的绿联 NAS** | **在绿联客户端内打开应用，选择设备唤醒** | 安装原生应用、添加目标 MAC；登录与外网入口复用 UGOS，无需额外中继硬件、组网或穿透服务 🙂 ✅ |
+| 普通局域网 WOL 工具 | 同一广播域内的手机或电脑 | 打开 WOL 工具，在局域网内发送 | 单靠局域网广播无法直接从外网唤醒，离开网络后还需解决远程入口和本地发包 🙁 ❌ |
+| [UU 远程辅助开机](https://uuyc.163.com/help/20241203/40220_1197682.html) | 同网常在线的 Windows / macOS 电脑或 Android 设备；另支持 UU 加速盒及已适配路由器 | 在 UU 远程客户端操作 | 常规方案需另留电脑或安卓设备常驻运行 UU 远程，电脑需防止休眠，安卓需保持供电并处理后台保活；路由器方案受适配范围限制 🙁 ❌ |
+| [专用开机棒，以向日葵局域网版为例](https://service.oray.com/question/30535.html) | 额外购买并常驻联网的开机棒 | 在厂商 App 中操作 | 需添置硬件、供电联网，并绑定厂商账号和目标设备 🙁 ❌ |
+| [NAS 自部署 WOL 网页，以 UpSnap 为例](https://github.com/seriousm4x/UpSnap) | 可利用已有 NAS | 通过浏览器访问单独的网页入口 | 需自行部署服务、配置身份验证与外网入口；日常需另开浏览器，通过独立网址或书签访问，并管理该服务的登录，操作入口较分散 🙁 ❌ |
+| [Tailscale + UpSnap / 局域网发包工具](https://tailscale.com/blog/wake-on-lan-tailscale-upsnap) | NAS、树莓派或其他常开主机 | 接入 Tailscale 后，再打开唤醒网页或工具 | 免公网 IP，但需部署和维护组网、发包工具及权限；日常需先接入组网，再切换到网页或工具；使用网页时还需另行管理网址或书签，多一层操作入口 🙁 ❌ |
+| [WOL 网页服务 + Cloudflare Tunnel](https://developers.cloudflare.com/learning-paths/clientless-access/connect-private-applications/) | 可利用 NAS 或其他常开主机 | 通过浏览器访问配置好的域名 | 免公网 IP，但需组合部署 WOL 服务、隧道、访问域名和身份验证；日常需另开浏览器，经独立域名或书签访问，并完成相应身份验证，入口与登录需单独管理 🙁 ❌ |
+| [路由器内置 WOL](https://www.asus.com/global/support/faq/1011268/) | 支持 WOL 的路由器 | 使用路由器 App 或网页，依型号而定 | 受型号与固件支持限制，本地 WOL 和外网管理入口需分别确认；采用网页方式时，需另开浏览器访问路由器管理入口，并在管理界面中找到唤醒功能 🙁 ❌ |
+| [公网 UDP 转发 + DDNS](https://www.tp-link.com/us/support/faq/923/) | 支持相关转发配置的路由器 | 在 WOL 工具中使用公网地址或域名发送 | 通常需要可入站公网地址、端口映射、地址绑定或静态 ARP；动态地址还可能需要 DDNS，配置受路由器能力限制 🙁 ❌ |
+
+**远程唤醒，应该是随手点几下就能完成的事。** 打开绿联客户端，进入“远程唤醒”，选择设备发送唤醒指令。常开的 NAS 在后台完成发包，用户无需关心服务地址、端口或组网连接，让唤醒自然融入已有客户端的日常操作。
+
+独立网页即使设了书签，也需要用户额外管理一个入口及其登录状态；书签省去了输入网址，却没有将它融入已有客户端的应用流程。部分网页方案同样能利用 NAS，ugos-wol 进一步把安装、身份认证和远程入口接入 UGOS，让用户少操心一套服务。
+
+上述优势以已拥有兼容、常驻运行且能够通过绿联远程访问的 NAS 为前提；当前应用仅限 NAS 管理员使用。所有 WOL 方案都要求目标设备支持并启用相应唤醒功能，NAS 发送接口与目标网卡需处于同一广播域。若现有路由器或组网方案已满足需求，继续复用也无需重复搭建。
+
+“无需额外网络配置”指唤醒的外网入口。目标设备的 WOL 设置，以及唤醒后的远程桌面、SSH 或串流连接仍需分别准备；本应用不提供这些连接的转发通道。
+
+## 功能
+
+- **局域网唤醒**：保存目标网卡 MAC，无需填写目标设备 IP。
+- **多网口、多网段**：自动向可用局域网接口广播，也可指定发送接口。
+- **远程访问**：通过绿联远程访问打开应用，由 NAS 在本地网络发包。
+- **设备与记录管理**：最多保存 32 台设备，保留最近 100 条发送记录及操作人。
+- **UGOS 身份接入**：使用当前 NAS 管理员身份，无需额外注册或设置应用密码。
+- **原生运行**：Go 静态后台、内置前端资源，无需 Docker 或外部图标服务；提供中文桌面和手机界面。
+
+## 界面预览
+
+![设备列表，使用示例名称与MAC地址](docs/assets/overview.png)
+
+## 工作方式
+
+```mermaid
+flowchart LR
+    A[浏览器或绿联客户端] -->|UGOS 登录与远程访问| B[运行中的 NAS]
+    B -->|局域网 WOL 魔术包| C[支持 WOL 的目标设备]
+```
+
+应用显示“已发送”表示 NAS 已发出数据包。WOL 没有接收确认，发送结果不能用来判断设备是否已启动或在线。
+
+设备启动后，使用已经配置好的远程桌面、SSH、管理界面或串流软件连接。UU 远程、Sunshine + Moonlight 等属于可搭配的独立工具，连接流量不经过本应用。
+
+## 使用要求
+
+| 项目 | 要求 |
+| --- | --- |
+| NAS 系统 | 支持原生 UPK 的 UGOS Pro；配置声明最低固件为 `1.13.0.0000` |
+| NAS 架构 | `amd64` / `arm64` 分别构建，安装时选择对应架构的 `nasync` 包 |
+| 登录账号 | NAS 管理员；同一 NAS 的管理员共享设备列表和发送记录 |
+| 目标设备 | 网卡、固件与目标电源状态支持标准 WOL 魔术包唤醒 |
+| 网络 | NAS 发送接口与目标网卡处于同一 IPv4 广播域 |
+
+支持 WOL 由目标硬件和系统决定，仅有网络接口并不代表能够被唤醒。无线网络、USB 网卡、扩展设备以及睡眠、休眠、关机等状态需分别验证。
+
+当前实机验证集中在 amd64 NAS；ARM64 提供构建支持，仍需实机验证。固件角色字段、应用隔离环境等差异见 [兼容性说明](docs/COMPATIBILITY.md)。
 
 ## 安装与使用
 
-1. 下载 `amd64_nasync_com.local.wol_0.2.4.0001.upk`，在 UGOS「应用中心」选择手动安装并上传。已安装旧版时选择更新，保留应用数据。仅适用于 x86_64 NAS，声明最低固件为 1.13.0.0000。
-2. 用 NAS 管理员账号登录 UGOS 或绿联客户端，从应用图标打开「远程唤醒」。应用自动使用当前身份，无需创建账号或设置唤醒密码。
-3. 进入设备列表，点击「添加设备」，填写名称和网卡 MAC。无需笔记本 IP。
-4. 发送接口默认自动识别，多网口 NAS 可指定与笔记本处于同一局域网的接口。
-5. 先让接电、有线联网的笔记本进入睡眠并测试；成功后，再从外网经绿联云打开应用验证。
+1. 在 UGOS 应用中心手动安装与 NAS 架构匹配的 UPK。自开发安装包的授权与签名要求参见 [绿联开发准备](https://developer.ugnas.com/doc/backend/quick-start/prepare.html)。
+2. 使用管理员账号登录 UGOS 桌面或绿联客户端，从应用图标打开“远程唤醒”。
+3. 添加设备，填写名称、目标网卡 MAC 和发送接口。默认自动使用所有可用局域网接口。
+4. 在目标设备支持的电源状态下进行局域网唤醒测试，再验证通过绿联远程访问使用。
 
-旧版设置的 `WOL_PASSWORD` 在新版不再读取，也不参与认证。设备配置及旧发送记录兼容，旧记录会显示未记录操作人。
+Windows、Linux、macOS 及其他设备的准备方式见应用内“设置指南”和 [设备准备指南](docs/DEVICE-SETUP.md)。
 
-应用使用 `inner` 桌面窗口、绿联官方 SDK 和 `api/wol` 网关路径，支持 UGREENlink 远程访问。0.1.3 已经真实 UGOS 会话验证；新版 0.2.0 通过浏览器、后端及 NAS 独立进程检查，仍需应用中心更新后的窗口与外网验证。
+## 权限与数据
 
-**自开发应用安装权限：**绿联官方开发流程要求测试设备获得开发者授权。如果系统拒绝安装自开发 UPK 或提示缺少授权，请按官方准备文档完成授权。这是系统要求，不能仅靠更改 UPK 文件绕过。此包为个人开发版本，未上架应用商店。
+应用使用 UGOS 官方 SDK 获取登录令牌，由系统网关验证身份。后台仅监听回环地址，要求经过认证的管理员身份，不直接向局域网公开服务端口。
 
-## 笔记本准备
+设备配置与发送记录保存在应用数据目录的 `state.json` 中，使用原子替换写入。数据在同一 NAS 的管理员之间共享。卸载会清理应用数据目录；需要保留配置时，请先备份该文件。
 
-- BIOS/UEFI 中启用 Wake on LAN；Windows 网卡驱动中启用 Wake on Magic Packet，并允许网卡唤醒计算机。具体选项由设备厂商提供。
-- 优先使用支持 WOL 的有线网卡。Wi-Fi 唤醒需要额外支持 WoWLAN；USB 网卡和扩展坞是否在睡眠/关机后继续供电也需确认。
-- NAS 与目标网卡位于同一广播域。访客网络、AP 隔离、不同 VLAN 通常无法直接接收本应用的本地广播。
-- 睡眠、休眠、关机是不同电源状态，不能因睡眠测试成功就认定关机也能唤醒。Windows 的快速启动、固件和驱动设置会影响结果。
+## 从源码构建
 
-Windows 查询 MAC：
+依赖：**Go 1.26.11**、官方 **ugcli 1.1.0.25 或更高版本**。修改前端时还需要 Node.js/npm。固定 Go 版本的原因见 [兼容性说明](docs/COMPATIBILITY.md)。
 
-```powershell
-Get-NetAdapter | Select Name,MacAddress,Status
+### 前端与后台
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run build
+
+(cd backend && go test ./...)
+TARGET_ARCH=all bash scripts/build-binaries.sh
 ```
 
-界面显示「唤醒包已发送」只代表 NAS 成功执行 UDP 发送。WOL 没有接收确认，因此本应用不会把发包成功显示成「电脑已开机」。
+`TARGET_ARCH` 支持 `amd64`、`arm64`、`all`，默认构建两种架构。输出分别位于 `packaging/rootfs_amd64/bin/` 和 `packaging/rootfs_arm64/bin/`。
 
-## 实现与数据
+### 生成 UPK
 
-- 应用 ID：`com.local.wol`。运行端口：`127.0.0.1:28089`，由 UGOS 网关代理；不直接向 LAN 暴露后台端口。
-- 不设置独立密码。前端从官方 SDK 的 `getThirdToken` 取得当前会话令牌，只发送 `Ugreen-Ttk`，不自行声称用户 ID 或角色。
-- 系统网关验证令牌后，向后台注入 `Ugreen-User-ID`、`Ugreen-User-Name`、`Ugreen-User-Type`。后台要求身份字段完整且角色为 `admin`；缺失身份返回 401，普通用户返回 403。某些固件不传角色字段时，0.1.3 会改查系统 `admin` 组，以经过网关认证的用户名进行精确成员匹配。
-- 后台仅接受回环来源并禁止绑定非回环地址，不信任 `X-Forwarded-For` 作为来源依据。该方案依赖 UGOS 网关覆盖并验证身份头，遵循官方原生应用的本机信任边界；不对本机其他程序建立额外密码屏障。
-- 设备列表由 NAS 管理员共享，发送记录保存当次用户 ID、用户名及角色。这里的“绑定”是认证与操作归属，不是每个管理员隔离一份设备配置。
-- 使用官方 `@ugreen-nas/core` 1.7.42 获取 `Ugreen-Ttk`，前端资源均在包内，无外部 CDN。
-- 每个被选中的局域网接口向其子网广播地址的 UDP 9 端口发送 3 个标准 102 字节魔术包，间隔 120ms；两次操作至少间隔 3 秒。
-- 不运行系统 shell 命令，不需要 root、原始套接字权限或 Docker 特权。只声明网络访问权限。
-- 自动排除 Docker 接口和 libvirt 的 `virbr` 网桥；无广播能力的隧道接口不会被选中。其他特殊虚拟接口可通过手动选择物理网口避开。
-- 设备和记录保存在 `UGAPP_DATA_DIR/state.json`，采用临时文件同步后原子替换。记录上限 100 条；损坏的原配置不会自动覆盖。**卸载会删除应用数据**，需要保留时先备份该文件。
-- 登录过期时，前端尝试刷新令牌；若仍无效则隐藏操作界面，提示重新登录 NAS。应用没有独立的登录/退出账号体系。
+正式 UPK 必须使用官方工具在 **x86_64 Linux 打包主机**上生成；打包主机架构与 NAS 目标架构是两个独立选择。
 
-## UGOS 启用兼容性
+```bash
+# 测试、构建并分别打包两种 NAS 架构
+TARGET_ARCH=all REBUILD_UI=1 BUILD_NUMBER=2 bash scripts/build-upk.sh
 
-0.1.2 改用仍受维护的 Go 1.26.11 构建，并固定构建脚本的工具链检查。实际 NAS 的 systemd 管理器会向原生应用注入 `GODEBUG=tlskyber=0`；Go 1.27 会在进入应用代码前因这个已移除的旧选项退出。0.1.2 已在该原始环境参数下验证启动，不要求修改 NAS 全局环境。
+# 已有目标架构的程序时，仅执行打包
+TARGET_ARCH=arm64 BUILD_NUMBER=2 bash scripts/pack-prebuilt.sh
+```
 
-本次设备已对 `com.local.wol.service` 添加专属兼容设置 `Environment=GODEBUG=`，并在实际 UGOS 沙箱中成功启动原先安装的 0.1.1。该设置位于 `/etc/systemd/system/com.local.wol.service.d/90-wol-go-compat.conf`，只影响本应用，设备配置和发送记录保留。应用已安装后的升级应由应用中心完成。
+可通过 `UGCLI_TOOL` 指定官方工具路径。UPK 默认导出到构建用户的 `~/Downloads/`，也可设置 `UPK_OUTPUT_DIR`。导出前检查全部目标文件，不覆盖已有安装包。同一版本再次发布时，递增 `BUILD_NUMBER`。
 
-## 旧固件的身份角色兼容
+仓库保留 Go 内嵌所需的已构建前端资源，不跟踪依赖目录、运行数据、后台可执行文件或 UPK。
 
-实际 UGOS 1.21.1.0016 的网关会提供经过认证的 `Ugreen-User-ID` 和 `Ugreen-User-Name`，但不提供 `Ugreen-User-Type`。0.1.3 在这种情况下读取系统 `admin` 组确认管理员身份；不接受仅有用户名的请求，也不会把普通用户自动视为管理员。显式的非管理员角色仍然拒绝。
-
-此 NAS 已完成一次性兼容设置：只为本应用的沙箱添加 `/etc/group` 只读绑定，配置位于 `/etc/systemd/system/com.local.wol.service.d/91-wol-legacy-auth.conf`。不会修改组成员或给应用 root 权限。管理员组成员调整后，应重启本应用以刷新文件绑定。
-
-在其他同类旧固件设备首次安装时，若提示无法读取管理员组，可由 NAS 管理员在源码目录执行 `sudo bash scripts/enable-legacy-auth.sh`。新固件正常提供角色字段时，不需要这一步。
-
-## 源码与构建
+## 项目结构
 
 ```text
-backend/                    Go 后台与测试，web/ 为已构建前端
-frontend/                   HTML/CSS/JS 源码，依赖与锁文件
-packaging/project.yaml      UGOS 原生应用配置
-packaging/rootfs_common/    图标和前端静态文件
-packaging/rootfs_amd64/bin/  Linux amd64 可执行程序的构建输出
-scripts/pack-prebuilt.sh    在 Linux 上打包已编译程序
-scripts/build-upk.sh        重新编译、测试并打包
-docs/VALIDATION.md          验证范围与未验证项目
+backend/       Go HTTP 服务、WOL 发送、身份校验与测试
+frontend/      界面源码、官方 SDK 集成和本地图标资源
+packaging/     UGOS 配置、公共资源与各架构构建输出
+scripts/       交叉编译、打包、导出和兼容性辅助工具
+docs/          设备准备、兼容性、验证与第三方许可说明
 ```
 
-Git 仓库不跟踪依赖、运行数据、编译程序或 UPK。首次从 Git 检出时，使用下方的源码编译流程；已经生成可执行程序后，可使用预编译打包流程。已构建的前端静态资源保留在仓库中，便于 Go 内嵌页面和离线打包。
+## 开发与反馈
 
-只打包已经生成的可执行程序，无需安装 Go/Node/Docker：在 **x86_64 Linux** 安装官方 `ugcli` 1.1.0.25，然后执行：
+修改前端后运行构建，同步 `backend/web/` 和 `packaging/rootfs_common/www/`。后端变更应通过 `go test ./...`；设备管理与认证变更还应验证旧配置兼容、管理员权限和桌面/手机界面。
 
-```bash
-UGCLI_TOOL=/absolute/path/to/ugcli BUILD_NUMBER=1 bash scripts/pack-prebuilt.sh
-```
+打包选择、导出和防覆盖逻辑可使用 Python 3 离线检查：`python3 scripts/tests/test_packaging.py`。测试只创建临时模拟文件，不调用真实打包工具或生成正式安装包。
 
-源码重新编译：准备 Go 1.26.11、官方 ugcli；需要修改前端时再准备 Node.js/npm。
+反馈兼容性问题时，请提供 NAS 型号、CPU 架构、UGOS 固件版本、目标设备的 WOL 支持情况和具体报错。验证范围见 [验证说明](docs/VALIDATION.md)。
 
-```bash
-# 默认使用已构建的前端
-BUILD_NUMBER=2 bash scripts/build-upk.sh
+## 许可证
 
-# 修改前端后重新打包
-REBUILD_UI=1 BUILD_NUMBER=2 bash scripts/build-upk.sh
-```
-
-正式 UPK 必须使用官方工具在 Linux 上生成。打包完成后自动将 UPK 移至当前用户的 `~/Downloads/`，也可通过 `UPK_OUTPUT_DIR` 指定用户目录中的其他交付位置。同一版本重复发布时递增构建号。源码包中没有 NAS 凭据、SSH 密钥、设备真实 MAC 或测试数据。
-
-## 官方参考
-
-- [UGOS 原生应用开发](https://developer.ugnas.com/en/doc/backend/quick-start/develop.html)
-- [开发准备与设备授权](https://developer.ugnas.com/en/doc/backend/quick-start/prepare.html)
-- [应用端口与绿联云访问](https://developer.ugnas.com/en/doc/backend/application/app-port.html)
-- [登录鉴权与 SDK 接入](https://developer.ugnas.com/en/doc/backend/system-capabilities/login-auth.html)
-- [运行环境与数据目录](https://developer.ugnas.com/en/doc/backend/application/runtime-environment.html)
-- [ugcli 下载及使用](https://developer.ugnas.com/en/doc/tools/ugcli.html)
-- [Microsoft：电源状态与 WOL 行为](https://learn.microsoft.com/en-us/windows/win32/power/system-power-states)
+本项目采用 [MIT License](LICENSE)。UGOS SDK、Fluent System Icons 和 Go 运行时的许可及来源见 [第三方组件](docs/THIRD-PARTY.md)。本项目为第三方应用，与绿联官方产品的关联仅限于平台接入。
