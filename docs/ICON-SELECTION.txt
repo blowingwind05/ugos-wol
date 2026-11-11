@@ -1,0 +1,13 @@
+主图标最终定稿（2026-11-11）
+
+用户已明确选择：居中＋不渐隐（三层完整圆环）。
+白色圆角底板，浅蓝色三层完整同心圆，电源符号与圆环完全同心。
+半径：内层64、中层88、外层112。
+颜色：外层 #F4FAFF、中层 #E5F2FF、内层 #C7E5FF，电源 #2F9CF4。
+使用加粗电源符号，无渐隐、无额外整体偏移。
+
+打包使用 frontend/icon.svg；构建同步到 backend/web/icon.svg 与 packaging/rootfs_common/www/icon.svg。
+UGOS 应用中心图标 packaging/rootfs_common/icon.png 由同一 SVG 导出。
+定稿 SVG 在设计目录中保留为 app-icon-approved.svg。
+
+之前的非居中渐隐版本及120度扇面等试稿仅供对比，不用于本次正式应用。
