@@ -92,6 +92,25 @@ type App struct {
 	send      func([]byte, Network, int) (int, error)
 }
 
+func usableLANInterface(nic net.Interface) bool {
+	if nic.Flags&net.FlagUp == 0 || nic.Flags&net.FlagBroadcast == 0 || nic.Flags&net.FlagLoopback != 0 {
+		return false
+	}
+	for _, prefix := range []string{"docker", "veth", "virbr"} {
+		if strings.HasPrefix(nic.Name, prefix) {
+			return false
+		}
+	}
+	// Docker uses br- followed by a 12-digit hexadecimal network ID.
+	// Keep named LAN bridges (for example br-lan) available to administrators.
+	if suffix := strings.TrimPrefix(nic.Name, "br-"); suffix != nic.Name && len(suffix) == 12 {
+		if _, err := hex.DecodeString(suffix); err == nil {
+			return false
+		}
+	}
+	return true
+}
+
 func localNetworks() ([]Network, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -99,10 +118,7 @@ func localNetworks() ([]Network, error) {
 	}
 	result := []Network{}
 	for _, nic := range interfaces {
-		if nic.Flags&net.FlagUp == 0 || nic.Flags&net.FlagBroadcast == 0 || nic.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		if strings.HasPrefix(nic.Name, "docker") || strings.HasPrefix(nic.Name, "veth") || strings.HasPrefix(nic.Name, "br-") || strings.HasPrefix(nic.Name, "virbr") {
+		if !usableLANInterface(nic) {
 			continue
 		}
 		addrs, err := nic.Addrs()
@@ -569,7 +585,7 @@ func (a *App) wake(w http.ResponseWriter, r *http.Request, id string) {
 		log.Printf("history persistence failed: %v", err)
 	}
 	status := 200
-	message := "唤醒包已发送，请稍后连接笔记本确认是否唤醒"
+	message := "唤醒包已发送，请通过目标设备或对应管理工具确认唤醒结果"
 	if event.Sent == 0 {
 		status = 502
 		message = "唤醒包发送失败，请查看发送记录"

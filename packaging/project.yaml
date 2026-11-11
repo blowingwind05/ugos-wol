@@ -3,6 +3,7 @@ app_id: com.local.wol
 version: "0.2.4"
 support_arch:
   - amd64
+  - arm64
 product_series:
   - nasync
 supports:
@@ -21,14 +22,15 @@ permissions:
 i18n:
   zh-CN:
     name: 远程唤醒
-    description: 利用绿联远程访问，以 NAS 为中继，从外网唤醒家中的电脑。本应用通过 NAS 发送 WOL（网络唤醒）魔术包，唤醒与 NAS 同一局域网内的兼容设备。电脑启动后，可搭配已配置好的 UU 远程或 Sunshine + Moonlight，进行远程办公与游戏串流。本应用不用于唤醒 NAS 本身。
-    author: Personal Tools
+    description: 通过运行中的绿联 NAS 发送标准 WOL（网络唤醒）魔术包，唤醒同一局域网内的兼容设备。可用于远程办公、工作站与服务器维护、网络存储访问及游戏串流等场景。目标设备需支持 WOL；远程连接由对应软件提供。本应用不用于唤醒承载它的 NAS。
+    author: UGOS WOL contributors
   en-US:
     name: Remote Wake
-    description: Use UGREEN remote access to open this app from outside your home, then let your NAS send Wake-on-LAN (WOL) magic packets to compatible devices on its local network. Once the computer starts, connect using your configured UU Remote or Sunshine + Moonlight setup for remote work or game streaming. This app does not wake the NAS itself.
-    author: Personal Tools
+    description: Send standard Wake-on-LAN (WOL) magic packets from a running UGREEN NAS to compatible devices on the same local network. Use it for remote work, workstation and server maintenance, storage access, and game streaming. Remote connections are provided by separately configured tools. This app does not wake the NAS hosting it.
+    author: UGOS WOL contributors
 license_agreement_link:
   - https://opensource.org/license/mit
 source_code_link:
   - https://www.npmjs.com/package/@ugreen-nas/core
   - https://go.dev/src/
+  - https://github.com/microsoft/fluentui-system-icons

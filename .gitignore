@@ -4,7 +4,7 @@ packaging/build_dir/
 *.log
 .DS_Store
 *.upk
-/packaging/rootfs_amd64/bin/wol
+/packaging/rootfs_*/bin/wol
 /backend/wol
 /backend/*.test
 .env
