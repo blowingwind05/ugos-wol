@@ -2,17 +2,19 @@ import UGOSCore from '@ugreen-nas/core';
 import cloudWindow from '@ugreen-nas/core/cloudWindow';
 
 const $ = (id) => document.getElementById(id);
+const iconSprite = typeof __WOL_ICON_SPRITE__ === 'undefined' ? './icons.svg' : __WOL_ICON_SPRITE__;
 let connected = false, thirdToken = '', initialized = false, editing = '';
 let model = {devices: [], history: [], networks: []};
 let toastTimer;
+let scanController = null, scanSerial = 0, scanSuggestedName = '';
 const wakeStates = new Map();
 const embedded = window.parent !== window || Boolean(window.UgWebHost);
 function text(tag, content, className = '') { const el = document.createElement(tag); el.textContent = content; el.className = className; return el; }
 function icon(name) {
   const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns,'svg'), use = document.createElementNS(ns,'use');
-  svg.classList.add('icon'); svg.setAttribute('aria-hidden','true'); use.setAttribute('href',`./icons.svg#${name}-20`); svg.append(use); return svg;
+  svg.classList.add('icon'); svg.setAttribute('aria-hidden','true'); use.setAttribute('href',`${iconSprite}#${name}-20`); svg.append(use); return svg;
 }
-function message(value, warning = false) { $('toast-message').textContent = value; $('toast').querySelector('use').setAttribute('href',`./icons.svg#${warning ? 'warning' : 'checkmark_circle'}-20`); $('toast').classList.toggle('warning', warning); $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 7500); }
+function message(value, warning = false) { $('toast-message').textContent = value; $('toast').querySelector('use').setAttribute('href',`${iconSprite}#${warning ? 'warning' : 'checkmark_circle'}-20`); $('toast').classList.toggle('warning', warning); $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 7500); }
 function formatTime(time) { return new Date(time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); }
 async function token(force = false) {
   if (!embedded) throw new Error('请从已登录的 UGOS 桌面或绿联客户端中打开本应用');
@@ -26,14 +28,19 @@ async function token(force = false) {
   thirdToken = info.third_token;
   return thirdToken;
 }
-async function request(path, method = 'GET', body, retry = true) {
+async function request(path, method = 'GET', body, retry = true, signal) {
   const headers = {};
   const ttk = await token(); if (ttk) headers['Ugreen-Ttk'] = ttk;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (signal?.aborted) throw new DOMException('请求已取消','AbortError');
+  const controller = new AbortController(), abort = () => controller.abort();
+  signal?.addEventListener('abort',abort,{once:true});
+  const timeout = setTimeout(abort,15000);
   let response;
-  try { response = await fetch(`/api/wol/v1/${path}`, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), credentials:'same-origin', signal:AbortSignal.timeout(15000)}); }
-  catch { throw new Error('无法连接唤醒服务，请重试'); }
-  if (response.status === 401 && embedded && retry) { await token(true); return request(path,method,body,false); }
+  try { response = await fetch(`/api/wol/v1/${path}`, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), credentials:'same-origin', signal:controller.signal}); }
+  catch { if (signal?.aborted) throw new DOMException('请求已取消','AbortError'); throw new Error('无法连接唤醒服务，请重试'); }
+  finally { clearTimeout(timeout); signal?.removeEventListener('abort',abort); }
+  if (response.status === 401 && embedded && retry) { await token(true); return request(path,method,body,false,signal); }
   let data;
   try { data = await response.json(); } catch {
     const error = new Error('UGOS 网关未返回有效身份数据，请重新登录 NAS 后打开应用');
@@ -112,7 +119,7 @@ function render() {
     const row = text('article','',`event${!event.sent ? ' failed' : ''}`);
     row.classList.toggle('failed',!event.sent || Boolean(event.error));
     const device = text('div','','event-device'), identity = document.createElement('div');
-    identity.append(text('h3',event.name),text('p',event.mac,'event-mac mono')); device.append(icon('iot'),identity);
+    identity.append(text('h3',event.name),text('p',event.mac,'event-mac mono')); device.append(icon('desktop'),identity);
     const status = text('div','','event-status'); status.append(icon(event.sent && !event.error ? 'checkmark_circle' : 'warning'),document.createTextNode(event.sent ? event.error ? '部分发送' : '已发送' : '发送失败'));
     const time = text('time',formatTime(event.time),'event-time'); time.dateTime = event.time;
     const actor = text('div',event.actor ? event.actor.name : '旧版记录 · 未记录','event-actor'); actor.title = event.actor ? `操作人：${event.actor.name}` : '旧版记录 · 未记录操作人';
@@ -128,6 +135,109 @@ function render() {
   if (!model.networks.length) $('networks').append(text('p','未找到支持广播的 IPv4 局域网接口，请检查 NAS 网络连接或应用网络权限。','error'));
   model.networks.forEach(network => { const row = text('div','','network-row'), info = text('div','','network-info'); info.append(text('strong',network.name),text('span',`NAS ${network.ip} · ${network.cidr}`)); row.append(icon('server'),info,text('code',`广播 ${network.broadcast}:9`)); $('networks').append(row); });
 }
+function stopDiscovery() {
+  scanSerial++;
+  scanController?.abort(); scanController = null;
+  $('scan-devices').disabled = !model.networks.length;
+  $('scan-devices').setAttribute('aria-busy','false');
+  $('scan-devices').querySelector('svg').classList.remove('is-spinning');
+  $('scan-devices').querySelector('span').textContent = '扫描';
+  $('scan-network').disabled = !model.networks.length;
+}
+function clearDiscovery() {
+  stopDiscovery();
+  $('scan-results').replaceChildren(); $('scan-results').hidden = true;
+  $('scan-status').textContent = ''; $('scan-status').classList.remove('error');
+}
+function showDeviceEntry(mode) {
+  const scanning = mode === 'scan';
+  $('device-discovery').hidden = !scanning; $('device-fields').hidden = scanning;
+  $('save-device').hidden = scanning;
+  for (const id of ['device-name','device-mac','device-network']) $(id).disabled = scanning;
+  for (const name of ['manual','scan']) {
+    const active = name === mode, tab = $(`entry-${name}`);
+    tab.setAttribute('aria-selected',String(active)); tab.tabIndex = active ? 0 : -1;
+  }
+}
+for (const mode of ['manual','scan']) {
+  $(`entry-${mode}`).addEventListener('click', () => showDeviceEntry(mode));
+  $(`entry-${mode}`).addEventListener('keydown', event => {
+    if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 'manual' : event.key === 'End' ? 'scan' : mode === 'manual' ? 'scan' : 'manual';
+    showDeviceEntry(next); $(`entry-${next}`).focus();
+  });
+}
+function resetDiscovery() {
+  clearDiscovery(); scanSuggestedName = '';
+  $('device-entry-tabs').hidden = Boolean(editing);
+  showDeviceEntry('manual');
+  $('scan-network').replaceChildren();
+  model.networks.forEach(network => $('scan-network').add(new Option(`${network.name} · ${network.cidr}`,network.id)));
+  if (!model.networks.length) {
+    $('scan-network').add(new Option('没有可用的局域网接口',''));
+    $('scan-status').textContent = '无法扫描，可切换到手动填写设备信息。';
+  }
+}
+function showDiscoveredDevices(result) {
+  const list = $('scan-results'); list.replaceChildren();
+  result.devices.forEach(device => {
+    const row = document.createElement('li'), button = document.createElement('button');
+    const saved = model.devices.some(item => item.mac.toUpperCase() === device.mac.toUpperCase());
+    button.type = 'button'; button.className = 'scan-result'; button.disabled = saved;
+    const label = device.name || device.ip;
+    button.setAttribute('aria-label',saved ? `${label}，${device.ip}，已添加` : `选择 ${label}，IP ${device.ip}，MAC ${device.mac}`);
+    const identity = text('span','','scan-identity');
+    identity.append(text('strong',label));
+    if (device.name) identity.append(text('span',device.ip,'mono'));
+    identity.append(text('span',device.mac,'mono'));
+    button.append(icon('desktop'),identity,text('span',saved ? '已添加' : '选择','scan-action'));
+    button.addEventListener('click', () => {
+      if (!model.networks.some(network => network.id === device.network)) {
+        $('scan-status').textContent = '扫描接口已不可用，请重新打开添加设备窗口。';
+        return;
+      }
+      $('device-mac').value = device.mac;
+      $('device-network').value = device.network;
+      if (!$('device-name').value.trim() || $('device-name').value === scanSuggestedName) {
+        scanSuggestedName = device.name ? [...device.name].slice(0,40).join('') : `设备 ${device.ip}`; $('device-name').value = scanSuggestedName;
+      }
+      $('device-error').textContent = '';
+      list.querySelectorAll('.scan-result').forEach(item => { item.classList.remove('selected'); item.removeAttribute('aria-pressed'); });
+      button.classList.add('selected'); button.setAttribute('aria-pressed','true');
+      showDeviceEntry('manual');
+      $('device-name').focus(); $('device-name').select();
+    });
+    row.append(button); list.append(row);
+  });
+  list.hidden = !result.devices.length;
+  const allSaved = result.devices.length && result.devices.every(device => model.devices.some(item => item.mac.toUpperCase() === device.mac.toUpperCase()));
+  const found = !result.devices.length ? '未发现可选设备，请确认目标已开机联网，或切换到手动填写。' : allSaved ? `发现的 ${result.devices.length} 个设备均已添加。` : `发现 ${result.devices.length} 个设备，选择一项即可填写。`;
+  $('scan-status').textContent = `${found} 扫描范围：${result.cidr}。${result.limited ? '网段较大，仅探测 NAS 所在的 /24 范围；其他范围的设备请手动添加。' : ''}`;
+}
+async function scanDevices() {
+  if (scanController || !model.networks.length) return;
+  clearDiscovery();
+  const serial = scanSerial, controller = new AbortController(); scanController = controller;
+  $('scan-devices').disabled = true; $('scan-network').disabled = true;
+  $('scan-devices').setAttribute('aria-busy','true');
+  $('scan-devices').querySelector('svg').classList.add('is-spinning');
+  $('scan-devices').querySelector('span').textContent = '扫描中';
+  $('scan-status').textContent = 'NAS 正在扫描并查询设备名称，请稍候…';
+  try {
+    const result = await request('scan','POST',{network:$('scan-network').value},true,controller.signal);
+    if (serial === scanSerial && $('device-dialog').open) showDiscoveredDevices(result);
+  } catch (error) {
+    if (serial !== scanSerial || controller.signal.aborted) return;
+    $('scan-status').textContent = error.message; $('scan-status').classList.add('error');
+    if (error.status === 401 || error.status === 403) sessionFailed(error);
+  } finally {
+    if (serial === scanSerial) stopDiscovery();
+  }
+}
+$('scan-devices').addEventListener('click',scanDevices);
+$('scan-network').addEventListener('change',clearDiscovery);
+$('device-dialog').addEventListener('close',stopDiscovery);
 function openDevice(device = null) {
   closeMenus();
   editing = device?.id || ''; $('dialog-title').textContent = editing ? '编辑设备' : '添加设备';
@@ -136,13 +246,15 @@ function openDevice(device = null) {
   model.networks.forEach(network => $('device-network').add(new Option(`${network.name} · ${network.cidr}`,network.id)));
   if (device && device.network !== 'auto' && !model.networks.some(item => item.id === device.network)) $('device-network').add(new Option('原接口已失效，请重新选择',device.network));
   $('device-network').value = device?.network || 'auto';
+  resetDiscovery();
   $('device-dialog').showModal();
 }
 $('add-device').addEventListener('click',() => openDevice()); $('add-first').addEventListener('click',() => openDevice());
 const closeDialog = () => $('device-dialog').close();
 $('close-dialog').addEventListener('click',closeDialog); $('cancel-device').addEventListener('click',closeDialog);
 $('device-form').addEventListener('submit', async (event) => {
-  event.preventDefault(); $('save-device').disabled = true; $('device-error').textContent = '';
+  event.preventDefault(); if ($('device-fields').hidden) return;
+  $('save-device').disabled = true; $('device-error').textContent = '';
   const input = {name:$('device-name').value,mac:$('device-mac').value,network:$('device-network').value};
   try { await request(editing ? `devices/${editing}` : 'devices',editing ? 'PUT' : 'POST',input); closeDialog(); await refresh(); message('设备已保存'); }
   catch (error) { $('device-error').textContent = error.message; if (error.status === 401 || error.status === 403) sessionFailed(error); }

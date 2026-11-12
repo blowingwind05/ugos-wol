@@ -83,6 +83,10 @@ type State struct {
 	History []Event  `json:"history"`
 }
 type App struct {
+	scanMu    sync.Mutex
+	scanning  bool
+	lastScan  time.Time
+	discover  func(context.Context, Network) (ScanResult, error)
 	mu        sync.Mutex
 	state     State
 	file      string
@@ -213,7 +217,7 @@ func newApp(dir string) (*App, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	a := &App{file: filepath.Join(dir, "state.json"), groupFile: "/etc/group", networks: localNetworks, send: sendPacket,
+	a := &App{file: filepath.Join(dir, "state.json"), groupFile: "/etc/group", networks: localNetworks, send: sendPacket, discover: discoverLAN,
 		state: State{Devices: []Device{}, History: []Event{}}}
 	data, err := os.ReadFile(a.file)
 	if err == nil {
@@ -407,6 +411,8 @@ func (a *App) route(w http.ResponseWriter, r *http.Request) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		respond(w, 200, map[string]any{"version": version, "user": r.Context().Value(userContextKey{}), "devices": a.state.Devices, "history": a.state.History, "networks": networks})
+	case path == "scan" && r.Method == "POST":
+		a.scanLAN(w, r)
 	case path == "devices" && r.Method == "POST":
 		a.writeDevice(w, r, "")
 	case strings.HasPrefix(path, "devices/") && !strings.Contains(strings.TrimPrefix(path, "devices/"), "/") && r.Method == "PUT":

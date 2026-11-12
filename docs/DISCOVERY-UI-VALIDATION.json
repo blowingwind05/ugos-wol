@@ -1,0 +1,23 @@
+{
+  "checks": [
+    "explicit scan action, current NAS interfaces, separate manual and discovery tabs",
+    "progress, duplicate prevention, already-added device disabled",
+    "selection returns to form with MAC and interface while preserving custom name",
+    "discovered hostname is displayed and used as an editable name",
+    "missing hostname falls back to IP and remains selectable",
+    "scan selection saved through normal authenticated device API",
+    "edit keeps existing form without discovery section",
+    "empty results preserve manual entry",
+    "large network reports actual /24 scope",
+    "rate limit shown inline with retry available",
+    "scan error leaves manual entry usable",
+    "close aborts scan and stale response cannot populate reopened form",
+    "discovery data is rendered as text",
+    "long Unicode hostnames fit the 40-character saved name limit",
+    "scan dialog fits 320/390/768/1280 widths without horizontal overflow",
+    "no LAN interface disables scanning but allows manual input",
+    "authorization failure closes dialog and enters denied state"
+  ],
+  "pageErrors": [],
+  "validation": "Mocked UGOS SDK and API; no LAN packets are sent by this UI test."
+}

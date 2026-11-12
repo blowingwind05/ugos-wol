@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-12",
+  "architecture": "amd64",
+  "packageVersion": "0.2.4.0004",
+  "displayVersion": "0.2.4",
+  "method": "Authenticated UGOS desktop, official App Center upgrade, actual embedded app scan in Chrome",
+  "assets": [
+    {
+      "file": "index.html",
+      "encoding": "gzip",
+      "sha256": "d858b8b848b6c995924fbc356a30ca60b1ba353ec5a6a2e4d3ba16cc3fe672de",
+      "matchesLocal": true
+    },
+    {
+      "file": "style.772ac17a9cff.css",
+      "encoding": "gzip",
+      "sha256": "772ac17a9cff677920687d4c185dcd9e8ca0ea6713d59a433ae0e71b21ffeb82",
+      "matchesLocal": true
+    },
+    {
+      "file": "icons.592ceee0a111.svg",
+      "encoding": "gzip",
+      "sha256": "592ceee0a111f2e8f100a794d9d504590ee52d9e6c85dcb034cf65e71b3b719d",
+      "matchesLocal": true
+    },
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "encoding": "gzip",
+      "sha256": "6b9fa7e3d896f9accc03006bef43fca7ce69b0a92116839e3afbf8d343e6d39e",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.84e2ec49f912.js",
+      "encoding": "gzip",
+      "sha256": "84e2ec49f9122d8e5600fa7d69e6ac29fdeca2c0577906f0c68adb531a216bda",
+      "matchesLocal": true
+    }
+  ],
+  "scans": [
+    {
+      "devices": 7,
+      "named": 6
+    }
+  ],
+  "ui": {
+    "rows": 7,
+    "icons": [
+      "./icons.592ceee0a111.svg#desktop-20"
+    ],
+    "namedRows": 6
+  },
+  "limitations": [
+    "ARM64 hardware and mobile client not tested in this verification.",
+    "Devices that do not publish a name continue to show IP and MAC."
+  ]
+}
