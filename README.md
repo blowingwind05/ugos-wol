@@ -4,11 +4,11 @@
 
 <img src="frontend/icon.svg" alt="远程唤醒图标" width="80" height="80" align="right">
 
-通过绿联 NAS 唤醒局域网内支持 **Wake-on-LAN（WOL）** 的设备。
+通过绿联 NAS 远程唤醒局域网内支持 **Wake-on-LAN（WOL）** 的电脑等设备。
 
 复用绿联 NAS 已有的远程访问能力：在外通过绿联客户端打开应用，由 NAS 在局域网内发送标准魔术包。对于已经能够远程访问 NAS 的用户，无需为 WOL 额外申请公网 IP、配置端口映射或部署内网穿透服务，也无需单独准备一台唤醒中继设备。[绿联原生应用远程访问说明](https://developer.ugnas.com/doc/backend/application/app-port.html)
 
-目标可以是工作站、服务器、网络存储或其他支持 WOL 的设备；本应用不用于唤醒承载它的 NAS。NAS 需要保持运行，目标设备仍需完成硬件与系统的 WOL 设置。
+目标可以是支持 WOL 的台式电脑、笔记本、服务器、NAS 等设备；本应用不用于唤醒承载它的 NAS。NAS 需要保持运行，目标设备仍需完成硬件与系统的 WOL 设置。
 
 ## 方案优势对比
 
@@ -40,6 +40,7 @@
 
 ## 功能
 
+- **局域网扫描**：添加设备时由 NAS 查找设备名称、IP 和 MAC，选择结果填入名称、MAC 和发送接口，保留手动填写。
 - **局域网唤醒**：保存目标网卡 MAC，无需填写目标设备 IP。
 - **多网口、多网段**：自动向可用局域网接口广播，也可指定发送接口。
 - **远程访问**：通过绿联远程访问打开应用，由 NAS 在本地网络发包。
@@ -81,8 +82,10 @@ flowchart LR
 
 1. 在 UGOS 应用中心手动安装与 NAS 架构匹配的 UPK。自开发安装包的授权与签名要求参见 [绿联开发准备](https://developer.ugnas.com/doc/backend/quick-start/prepare.html)。
 2. 使用管理员账号登录 UGOS 桌面或绿联客户端，从应用图标打开“远程唤醒”。
-3. 添加设备，填写名称、目标网卡 MAC 和发送接口。默认自动使用所有可用局域网接口。
+3. 添加设备时，可直接手动填写，或切换到“局域网扫描”，选择 NAS 网段并扫描；选中结果后核对名称、MAC 和发送接口再保存。手动填写默认自动使用所有可用局域网接口。
 4. 在目标设备支持的电源状态下进行局域网唤醒测试，再验证通过绿联远程访问使用。
+
+扫描会通过 DNS 反查、mDNS 和 NetBIOS 尝试获取设备名称；设备或网络没有提供名称时显示 IP，仍可自行命名。名称仅作识别提示，添加前请核对 MAC。扫描由 NAS 在所选接口发起，最多探测 NAS 所在的一个 `/24` 范围；较大网段会显示实际扫描范围。结果来自局域网邻居信息，可能包含缓存记录，不代表设备当前在线或支持 WOL。关机、隔离网络中的设备可能无法发现，仍可手动添加；扫描不会发送 WOL 魔术包，也不会自动保存设备。
 
 Windows、Linux、macOS 及其他设备的准备方式见应用内“设置指南”和 [设备准备指南](docs/DEVICE-SETUP.md)。
 
@@ -120,7 +123,7 @@ TARGET_ARCH=all REBUILD_UI=1 BUILD_NUMBER=2 bash scripts/build-upk.sh
 TARGET_ARCH=arm64 BUILD_NUMBER=2 bash scripts/pack-prebuilt.sh
 ```
 
-可通过 `UGCLI_TOOL` 指定官方工具路径。UPK 默认导出到构建用户的 `~/Downloads/`，也可设置 `UPK_OUTPUT_DIR`。导出前检查全部目标文件，不覆盖已有安装包。同一版本再次发布时，递增 `BUILD_NUMBER`。
+可通过 `UGCLI_TOOL` 指定官方工具路径。UPK 默认导出到构建用户的 `~/Downloads/`，也可设置 `UPK_OUTPUT_DIR`。导出前检查全部目标文件，不覆盖已有安装包。每次安装包内容变化都应递增 `BUILD_NUMBER`，即使应用显示版本保持不变；不要重复使用同一个完整包版本，以便系统和客户端区分更新。
 
 仓库保留 Go 内嵌所需的已构建前端资源，不跟踪依赖目录、运行数据、后台可执行文件或 UPK。
 
@@ -136,9 +139,11 @@ docs/          设备准备、兼容性、验证与第三方许可说明
 
 ## 开发与反馈
 
-修改前端后运行构建，同步 `backend/web/` 和 `packaging/rootfs_common/www/`。后端变更应通过 `go test ./...`；设备管理与认证变更还应验证旧配置兼容、管理员权限和桌面/手机界面。
+修改前端后运行构建，同步 `backend/web/` 和 `packaging/rootfs_common/www/`。构建根据文件内容生成脚本、样式和图标的文件名，并同步生成匹配的 gzip 副本，避免升级后混用旧压缩资源。后端变更应通过 `go test ./...`；设备管理与认证变更还应验证旧配置兼容、管理员权限和桌面/手机界面。
 
 打包选择、导出和防覆盖逻辑可使用 Python 3 离线检查：`python3 scripts/tests/test_packaging.py`。测试只创建临时模拟文件，不调用真实打包工具或生成正式安装包。
+
+前端资源缓存检查：`python3 scripts/tests/test_frontend_assets.py`（需要已安装前端构建依赖和可用的 Node.js）。检查重复构建稳定性，以及不改应用版本时的样式和图标更新。
 
 反馈兼容性问题时，请提供 NAS 型号、CPU 架构、UGOS 固件版本、目标设备的 WOL 支持情况和具体报错。验证范围见 [验证说明](docs/VALIDATION.md)。
 

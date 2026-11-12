@@ -4,11 +4,11 @@
 
 <img src="frontend/icon.svg" alt="Remote Wake icon" width="80" height="80" align="right">
 
-Wake devices that support **Wake-on-LAN (WOL)** on your local network through a UGREEN NAS.
+Wake computers and other devices that support **Wake-on-LAN (WOL)** on your local network through a UGREEN NAS.
 
 Reuse the remote access your NAS already provides: open the app in the UGREEN client from outside your network, and let the NAS send a standard magic packet locally. If you can already access your NAS remotely, there is no need to obtain a public IP address, configure port forwarding, deploy a tunnel, or set up another relay device just for WOL. See [UGREEN's native app remote access documentation](https://developer.ugnas.com/doc/backend/application/app-port.html).
 
-Targets can include workstations, servers, network storage, and other WOL-capable devices. This app wakes other devices, not the NAS hosting it. The NAS must remain running, and WOL must be enabled in the target device's hardware and operating system settings.
+Targets can include WOL-capable desktop PCs, laptops, servers, NAS devices, and more. This app wakes other devices, not the NAS hosting it. The NAS must remain running, and WOL must be enabled in the target device's hardware and operating system settings.
 
 ## Advantages and alternatives
 
@@ -40,6 +40,7 @@ These advantages assume a compatible UGREEN NAS that remains running and is alre
 
 ## Features
 
+- **LAN discovery:** scan from the NAS for device names, IP addresses, and MAC addresses, then select a result to fill in its name, MAC, and sending interface. Manual entry remains available.
 - **LAN wake-up:** save the target NIC's MAC address; no target IP address is required.
 - **Multiple interfaces and subnets:** broadcast through available LAN interfaces automatically, or select a specific sending interface.
 - **Remote access:** open the app through UGREEN remote access while the NAS sends packets locally.
@@ -81,8 +82,10 @@ Hardware validation currently focuses on amd64 NAS devices. ARM64 builds are sup
 
 1. Manually install the UPK matching your NAS architecture in the UGOS App Center. See [UGREEN's development preparation guide](https://developer.ugnas.com/doc/backend/quick-start/prepare.html) for authorization and signing requirements for self-developed packages.
 2. Sign in to the UGOS desktop or UGREEN client as an administrator, then open the app named “远程唤醒” (Remote Wake).
-3. Add a device with its name, target NIC MAC address, and sending interface. By default, all available LAN interfaces are used automatically.
+3. Add a device manually, or switch to “局域网扫描” (LAN Scan), choose a NAS network, and scan. Select a result, review its name, MAC address, and sending interface, then save. Manual entry defaults to using all available LAN interfaces automatically.
 4. Test local wake-up in a power state supported by the target device, then verify access through UGREEN remote access.
+
+Discovery tries reverse DNS, mDNS, and NetBIOS to obtain hostnames. If the device or network does not provide a name, its IP is shown and you can name it yourself. Names are identification hints; verify the MAC before adding a device. Discovery runs on the NAS through the selected interface and probes no more than the NAS's local `/24` range. For larger networks, the actual scan scope is displayed. Results come from LAN neighbour information and may include cached records; they do not confirm current online status or WOL support. Powered-off devices and devices on isolated networks may not be discovered and can still be added manually. Scanning sends no WOL magic packets and does not automatically save devices.
 
 Preparation instructions for Windows, Linux, macOS, and other devices are available in the in-app “设置指南” (Setup Guide) and the [Device Setup Guide](docs/DEVICE-SETUP.md).
 
@@ -120,7 +123,7 @@ TARGET_ARCH=all REBUILD_UI=1 BUILD_NUMBER=2 bash scripts/build-upk.sh
 TARGET_ARCH=arm64 BUILD_NUMBER=2 bash scripts/pack-prebuilt.sh
 ```
 
-Use `UGCLI_TOOL` to specify the official tool's path. UPKs are exported to the build user's `~/Downloads/` by default; override this with `UPK_OUTPUT_DIR`. All target files are checked before export, and existing packages are not overwritten. Increment `BUILD_NUMBER` when publishing another build of the same version.
+Use `UGCLI_TOOL` to specify the official tool's path. UPKs are exported to the build user's `~/Downloads/` by default; override this with `UPK_OUTPUT_DIR`. All target files are checked before export, and existing packages are not overwritten. Increment `BUILD_NUMBER` whenever package contents change, even if the displayed application version stays the same. Do not reuse a full package version; the system and clients need to distinguish updates.
 
 The repository retains the built frontend assets needed by Go embedding. Dependency directories, runtime data, backend executables, and UPKs are not tracked.
 
@@ -136,9 +139,11 @@ docs/          Device setup, compatibility, validation, and third-party notices
 
 ## Development and feedback
 
-After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, administrator permissions, and desktop/mobile behavior.
+After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Asset filenames are fingerprinted from their contents, and matching gzip copies are generated together to prevent stale compressed assets after an upgrade. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, administrator permissions, and desktop/mobile behavior.
 
 Run the offline packaging selection, export, and overwrite-protection checks with Python 3: `python3 scripts/tests/test_packaging.py`. These checks create only temporary fixtures; they do not invoke the real packaging tool or generate release packages.
+
+Run `python3 scripts/tests/test_frontend_assets.py` to check deterministic asset URLs and style/icon updates without an application version bump. This requires the frontend build dependencies and Node.js.
 
 When reporting compatibility issues, include the NAS model, CPU architecture, UGOS firmware version, target device's WOL support, and exact error. See [Validation](docs/VALIDATION.md) for the scope of testing.
 

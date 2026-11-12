@@ -5,4 +5,4 @@
 颜色：外层 #F4FAFF、中层 #E5F2FF、内层 #C7E5FF，电源 #2F9CF4。
 
 frontend/icon.svg 是应用图标的源码。构建时同步到后台内嵌资源与打包静态资源；应用中心的 packaging/rootfs_common/icon.png 从同一 SVG 导出。
-功能图标使用本地 Fluent System Icons 资源。设备卡片采用通用网络设备图标，不根据设备名称猜测类型。
+功能图标使用本地 Fluent System Icons 资源。设备列表入口、发送记录与扫描列表使用显示器图标；设备卡片与空状态沿用原来的电脑插图。

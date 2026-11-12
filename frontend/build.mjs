@@ -1,9 +1,13 @@
 import { build } from 'esbuild';
-import { mkdir, copyFile, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const fingerprint = data => createHash('sha256').update(data).digest('hex').slice(0,12);
+const assetName = (file,data) => `${path.parse(file).name}.${fingerprint(data)}${path.extname(file)}`;
 const iconFiles = (await readdir(path.join(root,'icons'))).filter(file => file.endsWith('.svg')).sort();
 const symbols = await Promise.all(iconFiles.map(async file => {
   const source = await readFile(path.join(root,'icons',file),'utf8');
@@ -12,10 +16,38 @@ const symbols = await Promise.all(iconFiles.map(async file => {
   return `<symbol id="${name}-${size}" viewBox="0 0 ${size} ${size}">${body}</symbol>`;
 }));
 const sprite = `<svg xmlns="http://www.w3.org/2000/svg">${symbols.join('')}</svg>`;
+const template = await readFile(path.join(root,'index.html'),'utf8');
+const resources = {
+  'icons.svg': Buffer.from(sprite),
+  'style.css': await readFile(path.join(root,'style.css')),
+  'icon.svg': await readFile(path.join(root,'icon.svg')),
+};
+const names = Object.fromEntries(Object.entries(resources).map(([file,data])=>[file,assetName(file,data)]));
+// Bundle once so embedded and packaged resources are byte-for-byte identical.
+const bundle = await build({
+  entryPoints:[path.join(root,'app.js')],write:false,bundle:true,minify:true,
+  target:'es2020',format:'esm',legalComments:'eof',
+  define:{__WOL_ICON_SPRITE__:JSON.stringify(`./${names['icons.svg']}`)},
+});
+resources['app.js'] = Buffer.from(bundle.outputFiles[0].contents);
+names['app.js'] = assetName('app.js',resources['app.js']);
+// Fingerprinted filenames avoid stale gzip sidecars associated with old basenames.
+const html = template.replace(/\.\/(icons\.svg|icon\.svg|style\.css|app\.js)(?:\?[^"'#\s<>]*)?/g,(_,file)=>`./${names[file]}`);
+const output = new Map([['index.html',Buffer.from(html)]]);
+for (const [file,data] of Object.entries(resources)) {
+  output.set(file,data); // Stable aliases for older already-open documents.
+  output.set(names[file],data);
+}
+// UGOS nginx may serve .gz before the original file. Always ship both together,
+// including index.html, and never let an old compressed copy survive a build.
+for (const [file,data] of [...output]) output.set(`${file}.gz`,gzipSync(data,{level:9}));
 const destinations = [path.join(root,'../backend/web'),path.join(root,'../packaging/rootfs_common/www')];
 for (const destination of destinations) {
   await mkdir(destination,{recursive:true});
-  await writeFile(path.join(destination,'icons.svg'),sprite);
-  for (const file of ['index.html','style.css','icon.svg']) await copyFile(path.join(root,file),path.join(destination,file));
-  await build({entryPoints:[path.join(root,'app.js')],outfile:path.join(destination,'app.js'),bundle:true,minify:true,target:'es2020',format:'esm',legalComments:'eof'});
+  for (const file of await readdir(destination)) {
+    if (/^(?:app|style|icons|icon)\.[0-9a-f]{12}\.(?:js|css|svg)(?:\.gz)?$/.test(file) && !output.has(file)) {
+      await unlink(path.join(destination,file));
+    }
+  }
+  for (const [file,data] of output) await writeFile(path.join(destination,file),data);
 }
