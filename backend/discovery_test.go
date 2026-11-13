@@ -56,6 +56,7 @@ func TestDiscoveryARPFiltersAndDeduplication(t *testing.T) {
 10.0.0.9 0x1 0x6 02:11:22:33:44:66 * eth0
 10.0.0.7 0x1 0x2 02:aa:bb:cc:dd:ee * eth0
 10.0.0.8 0x1 0x2 02:aa:bb:cc:dd:ee * eth0
+10.0.0.8 0x1 0x2 02:AA:BB:CC:DD:EE * eth0
 10.0.0.2 0x1 0x2 02:10:20:30:40:50 * eth0
 10.0.0.10 0x1 0x0 02:10:20:30:40:51 * eth0
 10.0.0.11 0x1 0x2 00:00:00:00:00:00 * eth0
@@ -73,7 +74,7 @@ not-an-ip 0x1 0x2 02:10:20:30:40:59 * eth0
 incomplete row
 `
 	got, err := readARP(strings.NewReader(cache), n, netip.MustParsePrefix(n.CIDR))
-	if err != nil || len(got) != 3 || got[0].IP != "10.0.0.7" || got[0].MAC != "02:AA:BB:CC:DD:EE" || got[1].IP != "10.0.0.9" || got[2].IP != "10.0.0.120" {
+	if err != nil || len(got) != 4 || got[0].IP != "10.0.0.7" || got[0].MAC != "02:AA:BB:CC:DD:EE" || got[1].IP != "10.0.0.8" || got[1].MAC != got[0].MAC || got[2].IP != "10.0.0.9" || got[3].IP != "10.0.0.120" {
 		t.Fatal(got, err)
 	}
 	for _, d := range got {
@@ -208,13 +209,21 @@ func TestDiscoveryOnNAS(t *testing.T) {
 		}
 	}
 	named := 0
+	expectedIP := os.Getenv("WOL_SCAN_EXPECT_IP")
+	foundExpected := expectedIP == ""
 	for _, device := range result.Devices {
+		if device.IP == expectedIP {
+			foundExpected = true
+		}
 		if device.Name != "" {
 			named++
 			if cleanDeviceName(device.Name) != device.Name {
 				t.Fatal("invalid discovered hostname")
 			}
 		}
+	}
+	if !foundExpected {
+		t.Fatal("expected target IP was absent from discovery results")
 	}
 	t.Logf("Unprivileged NAS discovery passed: %d neighbours, %d hostnames, bounded scope", len(result.Devices), named)
 }

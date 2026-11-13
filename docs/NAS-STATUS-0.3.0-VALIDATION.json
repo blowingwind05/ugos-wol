@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-12",
+  "packageVersion": "0.3.0.0001",
+  "architecture": "amd64",
+  "displayVersion": "0.3.0",
+  "checks": [
+    "Official App Center upgrade succeeded",
+    "Backend and sidebar versions agree on 0.3.0",
+    "Existing devices and history unchanged",
+    "Status endpoint authenticated and returned structured results",
+    "Explicit-IP status is not vetoed by relay MAC translation; details use an info icon",
+    "Actual gzip frontend responses match local build"
+  ],
+  "explicitCheck": {
+    "state": "online",
+    "source": "ip",
+    "macVerified": false
+  },
+  "assets": [
+    {
+      "file": "style.200d85334a30.css",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "index.html",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icons.2df006332e1d.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.fff81f5422e1.js",
+      "encoding": "gzip",
+      "matchesLocal": true
+    }
+  ],
+  "noWakePacketsSent": true,
+  "configurationUnchanged": true
+}

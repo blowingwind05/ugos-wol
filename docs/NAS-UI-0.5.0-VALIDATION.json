@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-13",
+  "packageVersion": "0.5.0.0002",
+  "architecture": "amd64",
+  "displayVersion": "0.5.0",
+  "checks": [
+    "Official App Center upgrade succeeded",
+    "Four static navigation SVG paths render",
+    "Dynamic device and task action SVG paths render",
+    "No SVG use elements or external sprite requests",
+    "Existing devices, tasks and history unchanged",
+    "Actual compressed resources match local build",
+    "Actual system dropdown renders and selects without saving",
+    "Typed clock normalization and two-column picker work",
+    "Timezone search selects the IANA value without saving",
+    "Save remains visible in the actual short NAS app window"
+  ],
+  "nav": [
+    {
+      "icon": "desktop-20",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "icon": "calendar_clock-20",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "icon": "history-20",
+      "width": 14,
+      "height": 13.99999713897705
+    },
+    {
+      "icon": "book_information-20",
+      "width": 12,
+      "height": 16
+    }
+  ],
+  "deviceIcons": [
+    {
+      "icon": "os_windows-20",
+      "width": 15.750001907348633,
+      "height": 15.750001907348633
+    },
+    {
+      "icon": "more_horizontal-20",
+      "width": 12.5,
+      "height": 2.5
+    },
+    {
+      "icon": "edit-20",
+      "width": 16.003297805786133,
+      "height": 16.003557205200195
+    },
+    {
+      "icon": "delete-20",
+      "width": 16,
+      "height": 16.5
+    },
+    {
+      "icon": "power-20",
+      "width": 15.000001907348633,
+      "height": 15.995189666748047
+    },
+    {
+      "icon": "clock-20",
+      "width": 16,
+      "height": 16
+    }
+  ],
+  "taskActions": [
+    {
+      "icon": "edit-20",
+      "width": 16.003297805786133,
+      "height": 16.003557205200195
+    },
+    {
+      "icon": "delete-20",
+      "width": 16,
+      "height": 16.5
+    }
+  ],
+  "externalSpriteRequests": 0,
+  "assets": [
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "port": "10002",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "index.html",
+      "port": "10002",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "style.43d74fab2095.css",
+      "port": "10002",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "index.html",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "style.43d74fab2095.css",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.f3a0858c3f72.js",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.f3a0858c3f72.js",
+      "port": "10002",
+      "encoding": "gzip",
+      "matchesLocal": true
+    }
+  ],
+  "configurationUnchanged": true,
+  "scope": "Real UGOS App Center upgrade and isolated Chrome UI checks; opened forms were canceled without saving; user client not yet confirmed."
+}

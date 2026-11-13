@@ -40,7 +40,10 @@ These advantages assume a compatible UGREEN NAS that remains running and is alre
 
 ## Features
 
-- **LAN discovery:** scan from the NAS for device names, IP addresses, and MAC addresses, then select a result to fill in its name, MAC, and sending interface. Manual entry remains available.
+- **Scheduled wake-up:** one-shot, daily, weekdays, weekends, or selected days and times, with NAS-side execution, saved timezones, next-run previews and enable/disable controls.
+- **Reachability:** NAS-side probes distinguish online, unresponsive, and unknown states, with automatic checks after wake-up. Select a status badge to see the reason and check time.
+- **Optional device details:** leave IP and OS unset, or select Windows, macOS, Linux, or Other. Matching local OS icons are included.
+- **LAN discovery:** scan from the NAS for device names, IP addresses, and MAC addresses, then select a result to fill in its name, MAC, IP, and sending interface. Manual entry remains available.
 - **LAN wake-up:** save the target NIC's MAC address; no target IP address is required.
 - **Multiple interfaces and subnets:** broadcast through available LAN interfaces automatically, or select a specific sending interface.
 - **Remote access:** open the app through UGREEN remote access while the NAS sends packets locally.
@@ -82,18 +85,34 @@ Hardware validation currently focuses on amd64 NAS devices. ARM64 builds are sup
 
 1. Manually install the UPK matching your NAS architecture in the UGOS App Center. See [UGREEN's development preparation guide](https://developer.ugnas.com/doc/backend/quick-start/prepare.html) for authorization and signing requirements for self-developed packages.
 2. Sign in to the UGOS desktop or UGREEN client as an administrator, then open the app named “远程唤醒” (Remote Wake).
-3. Add a device manually, or switch to “局域网扫描” (LAN Scan), choose a NAS network, and scan. Select a result, review its name, MAC address, and sending interface, then save. Manual entry defaults to using all available LAN interfaces automatically.
+3. Add a device manually, or switch to “局域网扫描” (LAN Scan), choose a NAS network, and scan. Select a result, review its name, MAC address, IP, and sending interface, then save. Manual entry defaults to using all available LAN interfaces automatically.
 4. Test local wake-up in a power state supported by the target device, then verify access through UGREEN remote access.
 
 Discovery tries reverse DNS, mDNS, and NetBIOS to obtain hostnames. If the device or network does not provide a name, its IP is shown and you can name it yourself. Names are identification hints; verify the MAC before adding a device. Discovery runs on the NAS through the selected interface and probes no more than the NAS's local `/24` range. For larger networks, the actual scan scope is displayed. Results come from LAN neighbour information and may include cached records; they do not confirm current online status or WOL support. Powered-off devices and devices on isolated networks may not be discovered and can still be added manually. Scanning sends no WOL magic packets and does not automatically save devices.
 
+IP is optional and used only for status checks, never for WOL transmission. Discovery selection fills it automatically. A manually entered IP must be an IPv4 host on the selected NAS LAN; update or clear it if DHCP changes the address. OS is selected manually rather than inferred from a name or MAC.
+
+Discovery preserves different IPs sharing the same MAC. Wireless relays may translate MAC addresses or answer ARP on behalf of clients. Shared-MAC results prompt you to verify the target NIC's real MAC and preserve an already entered MAC.
+
+Status checks use bounded TCP connection probes (22, 443, 445, 3389) and UDP port 9 responses. An explicit IP is checked directly, so relay MAC translation does not block its status. Without an IP, the NAS resolves and verifies the MAC-to-IP mapping. No target agent, raw sockets, or system permission changes are required. Without an IP, the NAS checks neighbour records and, if needed, shares a bounded LAN scan (up to its local `/24` on each interface). Cached neighbours alone never prove liveness. While the device page is visible, checks run roughly every 15 seconds, or every 5 seconds for up to 60 seconds after wake-up; closing the page stops polling. Online means the checked address responded on the network, not that login or a remote service is ready. Unresponsive may mean shutdown, sleep, or filtering; an unresolved or unverified automatically inferred IP/MAC is shown as unknown. Keep an explicitly configured IP associated with the intended device.
+
 Preparation instructions for Windows, Linux, macOS, and other devices are available in the in-app “设置指南” (Setup Guide) and the [Device Setup Guide](docs/DEVICE-SETUP.md).
+
+### Scheduled wake-up
+
+After adding a device, open “定时任务” (Scheduled Tasks), create a task, and select the device, repeat rule, time and timezone. One-shot tasks also require a date; custom rules let you select weekdays. Weekdays means Monday–Friday and weekends means Saturday–Sunday, without public-holiday or compensatory-workday rules.
+
+Tasks run in the NAS backend, independently of open browser or mobile windows. Keep the NAS and app service running. Each task saves its own timezone, initially taken from the NAS when available or the browser otherwise. Up to 64 tasks are supported. They use the device's currently saved MAC and sending interface; an IP is not required.
+
+Occurrences missed while the NAS or app was stopped are skipped rather than replayed. One-shot tasks disable after execution or expiry. An occurrence is durably claimed before transmission; an interrupted execution may show an unknown result and is not automatically retried. The task list shows the last result and transmission history identifies the task. Remove associated tasks before deleting their device.
+
+![Scheduled tasks with sample devices and times](docs/assets/tasks-desktop.png)
 
 ## Permissions and data
 
 The frontend obtains a login token through the official UGOS SDK, and the system gateway verifies the user's identity. The backend listens only on loopback, requires an authenticated administrator identity, and does not directly expose a service port to the LAN.
 
-Device configuration and transmission history are stored in `state.json` in the application's data directory using atomic file replacement. This data is shared by administrators on the same NAS. Uninstallation removes the application data directory; back up this file first if you want to retain your configuration.
+Device configuration, scheduled tasks and transmission history are stored in `state.json` in the application's data directory using atomic file replacement. This data is shared by administrators on the same NAS. Uninstallation removes the application data directory; back up this file first if you want to retain your configuration.
 
 ## Build from source
 
@@ -117,10 +136,10 @@ Release UPKs must be generated with the official tooling on an **x86_64 Linux pa
 
 ```bash
 # Test, build, and package both NAS architectures
-TARGET_ARCH=all REBUILD_UI=1 BUILD_NUMBER=2 bash scripts/build-upk.sh
+TARGET_ARCH=all REBUILD_UI=1 BUILD_NUMBER=1 bash scripts/build-upk.sh
 
 # Package existing binaries for the selected target architecture
-TARGET_ARCH=arm64 BUILD_NUMBER=2 bash scripts/pack-prebuilt.sh
+TARGET_ARCH=arm64 BUILD_NUMBER=1 bash scripts/pack-prebuilt.sh
 ```
 
 Use `UGCLI_TOOL` to specify the official tool's path. UPKs are exported to the build user's `~/Downloads/` by default; override this with `UPK_OUTPUT_DIR`. All target files are checked before export, and existing packages are not overwritten. Increment `BUILD_NUMBER` whenever package contents change, even if the displayed application version stays the same. Do not reuse a full package version; the system and clients need to distinguish updates.
@@ -139,7 +158,7 @@ docs/          Device setup, compatibility, validation, and third-party notices
 
 ## Development and feedback
 
-After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Asset filenames are fingerprinted from their contents, and matching gzip copies are generated together to prevent stale compressed assets after an upgrade. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, administrator permissions, and desktop/mobile behavior.
+After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Asset filenames are fingerprinted from their contents, and matching gzip copies are generated together to prevent stale compressed assets after an upgrade. UI icons embed local library SVG geometry directly in HTML and JavaScript, without external sprite references. The build generates `frontend/icon-data.js`. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, administrator permissions, and desktop/mobile behavior.
 
 Run the offline packaging selection, export, and overwrite-protection checks with Python 3: `python3 scripts/tests/test_packaging.py`. These checks create only temporary fixtures; they do not invoke the real packaging tool or generate release packages.
 

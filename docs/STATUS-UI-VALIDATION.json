@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "online, unresponsive and unknown remain distinct",
+    "explicit IP status works through a relay, details use an info icon, and version is 0.5.0",
+    "inline OS icons render with external sprites blocked; unspecified systems retain original artwork",
+    "legacy devices open with optional IP and OS unset",
+    "optional IP and OS round-trip through edit and save",
+    "invalid IP reports inline and preserves form",
+    "manual addition without IP still works",
+    "discovery preserves both IPs for one MAC, fills the selected IP, warns about relay MACs and preserves the manually entered real MAC",
+    "optional fields and icon preview fit desktop and 320px mobile dialog",
+    "wake sends independently of status and starts a fresh status check",
+    "status endpoint authorization failure ends the session"
+  ],
+  "pageErrors": [],
+  "validation": "Mocked SDK/API in isolated Chrome; does not send LAN or WOL packets."
+}

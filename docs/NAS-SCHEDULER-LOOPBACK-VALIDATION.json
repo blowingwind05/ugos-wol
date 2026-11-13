@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-13",
+  "version": "0.4.0",
+  "architecture": "amd64",
+  "test": "WOL_SCHEDULER_INTEGRATION=1 TestSchedulerLoopbackOnNAS",
+  "result": "passed",
+  "elapsed_seconds": 2.24,
+  "verified_magic_packets": 3,
+  "checks": [
+    "Actual background scheduler runs without a frontend",
+    "Loopback receiver verifies full 102-byte magic packets",
+    "Task result and transmission history persist",
+    "One-shot task disables after execution",
+    "Scheduler stops on context cancellation"
+  ],
+  "LAN_broadcasts": false,
+  "scope": "Standalone unprivileged NAS diagnostic with a temporary data directory; production UI CRUD is validated separately."
+}

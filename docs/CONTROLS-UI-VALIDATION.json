@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "system icons, keyboard selection and Escape only closes a menu",
+    "scan network uses the shared dropdown",
+    "typed time is normalized and invalid clock values cannot submit",
+    "two-column clock selection updates the typed input",
+    "searchable timezone saves its IANA value and updates the displayed zone",
+    "calendar and typed dates share validation, including impossible dates",
+    "enhanced controls round-trip through the existing task API",
+    "custom menus remain in the viewport at 320, 390, 768 and 1440px",
+    "save and cancel stay visible when advanced settings are expanded in a 600px-high window"
+  ],
+  "pageErrors": [],
+  "validation": "Actual frontend with mocked UGOS SDK/API; external SVG sprites blocked; no LAN or WOL packets sent."
+}
