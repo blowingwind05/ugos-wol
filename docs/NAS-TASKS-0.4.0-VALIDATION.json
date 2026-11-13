@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-13",
+  "packageVersion": "0.4.0.0001",
+  "architecture": "amd64",
+  "displayVersion": "0.4.0",
+  "checks": [
+    "Official App Center upgrade succeeded",
+    "Backend and sidebar versions agree on 0.4.0",
+    "Legacy devices/history preserved and tasks schema loads",
+    "Real UI creates a disabled workday task with Monday-Friday",
+    "Editing supports weekends and custom weekdays/time",
+    "Far-future one-shot task enables with a next run and pauses correctly",
+    "Task persists after closing/reopening the app window",
+    "Delete removes only the temporary task; original devices/history/tasks unchanged",
+    "Actual gzip resources match local build"
+  ],
+  "defaultTimezone": "Asia/Shanghai",
+  "assets": [
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "index.html",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "style.41b8599863e3.css",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icons.0b6572bb4a6d.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.a2e5d890d923.js",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "style.41b8599863e3.css",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icon.6b9fa7e3d896.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "app.a2e5d890d923.js",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "index.html",
+      "encoding": "gzip",
+      "matchesLocal": true
+    },
+    {
+      "file": "icons.0b6572bb4a6d.svg",
+      "encoding": "gzip",
+      "matchesLocal": true
+    }
+  ],
+  "noLANWakePacketsSent": true,
+  "configurationUnchanged": true
+}

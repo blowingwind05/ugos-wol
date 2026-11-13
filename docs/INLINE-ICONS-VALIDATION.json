@@ -1,0 +1,66 @@
+{
+  "checks": [
+    "blocked external SVG reproduces all four missing navigation icons",
+    "inline SVG paths render with sprite requests still blocked",
+    "fixed page makes no external sprite requests and contains no SVG use elements",
+    "all four icon slots and labels align"
+  ],
+  "before": [
+    {
+      "width": 0,
+      "height": 0
+    },
+    {
+      "width": 0,
+      "height": 0
+    },
+    {
+      "width": 0,
+      "height": 0
+    },
+    {
+      "width": 0,
+      "height": 0
+    }
+  ],
+  "after": [
+    {
+      "width": 16,
+      "height": 16
+    },
+    {
+      "width": 16,
+      "height": 16
+    },
+    {
+      "width": 14,
+      "height": 13.99999713897705
+    },
+    {
+      "width": 12,
+      "height": 16
+    }
+  ],
+  "blockedRequests": [
+    "/icons.svg"
+  ],
+  "positions": [
+    {
+      "iconX": 28,
+      "textX": 60
+    },
+    {
+      "iconX": 28,
+      "textX": 60
+    },
+    {
+      "iconX": 28,
+      "textX": 60
+    },
+    {
+      "iconX": 28,
+      "textX": 60
+    }
+  ],
+  "scope": "Simulated external-resource failure in isolated Chrome; does not identify the exact restriction in the user client."
+}

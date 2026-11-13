@@ -1,6 +1,7 @@
 """Verify upgrade cache isolation without changing the application version."""
 import gzip
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -28,14 +29,15 @@ class FrontendAssetsTest(unittest.TestCase):
         web = self.root / "backend/web"
         html = (web / "index.html").read_text()
         urls = {f'{base}.{ext}': digest for base,digest,ext in re.findall(r'\./(icons|icon|style|app)\.([0-9a-f]{12})\.(svg|css|js)',html)}
-        self.assertEqual(set(urls), {"icons.svg", "icon.svg", "style.css", "app.js"})
+        self.assertEqual(set(urls), {"icon.svg", "style.css", "app.js"})
         for name, digest in urls.items():
             data = (web / name).read_bytes()
             self.assertEqual(hashlib.sha256(data).hexdigest()[:12], digest)
             self.assertEqual(data, (self.root / "packaging/rootfs_common/www" / name).read_bytes())
             base,ext=name.rsplit(".",1)
             self.assertEqual(data,(web/f"{base}.{digest}.{ext}").read_bytes())
-        self.assertIn("./icons." + urls["icons.svg"] + ".svg", (web / "app.js").read_text())
+        urls['icons.svg'] = hashlib.sha256((web/'icons.svg').read_bytes()).hexdigest()[:12]
+        self.assertEqual((web/'icons.svg').read_bytes(),(web/f"icons.{urls['icons.svg']}.svg").read_bytes())
         for file in web.iterdir():
             if file.suffix==".gz":
                 self.assertEqual(gzip.decompress(file.read_bytes()),file.with_suffix("").read_bytes())
@@ -45,10 +47,17 @@ class FrontendAssetsTest(unittest.TestCase):
         self.assertTrue((web/"index.html.gz").exists())
         self.assertNotIn("./icons.svg#", html)
         self.assertNotIn("./icons.svg#", (web / "app.js").read_text())
+        self.assertNotIn("<use",html)
+        data=(self.root/'frontend/icon-data.js').read_text().split('export default ',1)[1].strip().removesuffix(';')
+        definitions=json.loads(data)
+        for name in ['desktop-20','laptop-48','calendar_clock-20','os_windows-20']:
+            self.assertIn(name,definitions)
+            self.assertTrue(ET.fromstring('<svg>'+definitions[name]['body']+'</svg>').findall('.//path'))
         symbols = {node.attrib["id"] for node in ET.fromstring((web / "icons.svg").read_text())}
-        references = re.findall(r'\./icons\.[0-9a-f]{12}\.svg#([^"\s]+)', html)
+        references = re.findall(r'data-icon="([^"]+)"', html)
+        self.assertTrue(references)
         self.assertTrue(set(references).issubset(symbols))
-        self.assertIn("v0.2.4", html)
+        self.assertIn("v0.5.0", html)
         return urls
 
     def test_stale_precompressed_assets_are_replaced(self):
@@ -70,14 +79,15 @@ class FrontendAssetsTest(unittest.TestCase):
         self.assertEqual(before["app.js"], after["app.js"])
         self.assertEqual(before["icons.svg"], after["icons.svg"])
 
-    def test_sprite_changes_update_static_and_dynamic_references(self):
+    def test_icon_changes_update_embedded_paths_and_bundle(self):
         before = self.build()
-        (self.root / "frontend/icons/cache_probe_20_regular.svg").write_text(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M1 1h2v2H1z"/></svg>')
+        icon=self.root/'frontend/icons/desktop_20_regular.svg'
+        icon.write_text(icon.read_text().replace('</svg>','<path d="M1 1h2v2H1z"/></svg>'))
         after = self.build()
         self.assertNotEqual(before["icons.svg"], after["icons.svg"])
         self.assertNotEqual(before["app.js"], after["app.js"])
         self.assertEqual(before["style.css"], after["style.css"])
+        self.assertIn('d="M1 1h2v2H1z"',(self.root/'backend/web/index.html').read_text())
 
 
 if __name__ == "__main__":

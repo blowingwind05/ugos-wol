@@ -8,4 +8,6 @@ esbuild 0.28.2 (MIT) is a build-time dependency and is not required on the NAS. 
 
 The official UGREEN `ugcli` is used only for packaging; it is not redistributed in the source archive or installed application. Playwright and Chrome were used for development checks and are not included in the application.
 
-Microsoft Fluent System Icons 1.1.345 (MIT) provides the interface SVG icons. The app icon adapts the Fluent power symbol; its background circles are app artwork. Source: https://github.com/microsoft/fluentui-system-icons . License: FLUENT-ICONS-LICENSE.txt. Selected original SVG assets are vendored under frontend/icons; runtime sprites are generated locally, with no external icon service.
+Microsoft Fluent System Icons 1.1.345 (MIT) provides the interface SVG icons. The app icon adapts the Fluent power symbol; its background circles are app artwork. Source: https://github.com/microsoft/fluentui-system-icons . License: FLUENT-ICONS-LICENSE.txt. Selected original SVG assets are vendored under frontend/icons; runtime SVG geometry is generated locally and embedded directly, with no external icon service or sprite request.
+
+Font Awesome Free 6.7.2 provides the Windows, Apple and Linux brand SVG icons (CC BY 4.0). Copyright Fonticons, Inc. Source: https://github.com/FortAwesome/Font-Awesome/tree/6.7.2/svgs/brands . Icons are scaled and recolored to match the interface; original path geometry is retained. Full license: FONT-AWESOME-LICENSE.txt. System selection is user-provided and does not imply affiliation or endorsement.

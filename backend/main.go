@@ -30,7 +30,7 @@ import (
 var assets embed.FS
 
 const api = "/api/wol/v1/"
-const version = "0.2.4"
+const version = "0.5.0"
 
 type User struct {
 	ID   string `json:"id"`
@@ -61,6 +61,8 @@ type Device struct {
 	Name    string `json:"name"`
 	MAC     string `json:"mac"`
 	Network string `json:"network"`
+	IP      string `json:"ip,omitempty"`
+	OS      string `json:"os,omitempty"`
 }
 type Network struct {
 	ID        string `json:"id"`
@@ -70,30 +72,40 @@ type Network struct {
 	Broadcast string `json:"broadcast"`
 }
 type Event struct {
-	Time    time.Time `json:"time"`
-	Name    string    `json:"name"`
-	MAC     string    `json:"mac"`
-	Sent    int       `json:"sent"`
-	Targets []string  `json:"targets"`
-	Error   string    `json:"error,omitempty"`
-	Actor   *User     `json:"actor,omitempty"`
+	Time     time.Time `json:"time"`
+	Name     string    `json:"name"`
+	MAC      string    `json:"mac"`
+	Sent     int       `json:"sent"`
+	Targets  []string  `json:"targets"`
+	Error    string    `json:"error,omitempty"`
+	Actor    *User     `json:"actor,omitempty"`
+	TaskID   string    `json:"task_id,omitempty"`
+	TaskName string    `json:"task_name,omitempty"`
 }
 type State struct {
 	Devices []Device `json:"devices"`
 	History []Event  `json:"history"`
+	Tasks   []Task   `json:"tasks"`
 }
 type App struct {
-	scanMu    sync.Mutex
-	scanning  bool
-	lastScan  time.Time
-	discover  func(context.Context, Network) (ScanResult, error)
-	mu        sync.Mutex
-	state     State
-	file      string
-	lastWake  time.Time
-	groupFile string
-	networks  func() ([]Network, error)
-	send      func([]byte, Network, int) (int, error)
+	statusMu       sync.Mutex
+	statusBusy     bool
+	statusCacheKey string
+	statusCache    []DeviceStatus
+	statusCachedAt time.Time
+	checkStatuses  func(context.Context, []Device, []Network) []DeviceStatus
+	scanMu         sync.Mutex
+	scanning       bool
+	lastScan       time.Time
+	discover       func(context.Context, Network) (ScanResult, error)
+	mu             sync.Mutex
+	state          State
+	file           string
+	lastWake       time.Time
+	taskError      string
+	groupFile      string
+	networks       func() ([]Network, error)
+	send           func([]byte, Network, int) (int, error)
 }
 
 func usableLANInterface(nic net.Interface) bool {
@@ -217,7 +229,7 @@ func newApp(dir string) (*App, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	a := &App{file: filepath.Join(dir, "state.json"), groupFile: "/etc/group", networks: localNetworks, send: sendPacket, discover: discoverLAN,
+	a := &App{file: filepath.Join(dir, "state.json"), groupFile: "/etc/group", networks: localNetworks, send: sendPacket, discover: discoverLAN, checkStatuses: checkDeviceStatuses,
 		state: State{Devices: []Device{}, History: []Event{}}}
 	data, err := os.ReadFile(a.file)
 	if err == nil {
@@ -232,6 +244,9 @@ func newApp(dir string) (*App, error) {
 	}
 	if a.state.History == nil {
 		a.state.History = []Event{}
+	}
+	if a.state.Tasks == nil {
+		a.state.Tasks = []Task{}
 	}
 	return a, nil
 }
@@ -262,6 +277,7 @@ func (a *App) save(next State) error {
 		return err
 	}
 	a.state = next
+	a.taskError = ""
 	return nil
 }
 
@@ -410,9 +426,15 @@ func (a *App) route(w http.ResponseWriter, r *http.Request) {
 		}
 		a.mu.Lock()
 		defer a.mu.Unlock()
-		respond(w, 200, map[string]any{"version": version, "user": r.Context().Value(userContextKey{}), "devices": a.state.Devices, "history": a.state.History, "networks": networks})
+		respond(w, 200, map[string]any{"version": version, "user": r.Context().Value(userContextKey{}), "devices": a.state.Devices, "history": a.state.History, "networks": networks, "tasks": a.state.Tasks, "task_error": a.taskError, "default_timezone": defaultTimezone(), "server_time": time.Now().UTC()})
+	case path == "tasks" && r.Method == "POST":
+		a.writeTask(w, r, "")
+	case strings.HasPrefix(path, "tasks/"):
+		a.taskRoute(w, r, strings.TrimPrefix(path, "tasks/"))
 	case path == "scan" && r.Method == "POST":
 		a.scanLAN(w, r)
+	case path == "status" && r.Method == "POST":
+		a.deviceStatuses(w, r)
 	case path == "devices" && r.Method == "POST":
 		a.writeDevice(w, r, "")
 	case strings.HasPrefix(path, "devices/") && !strings.Contains(strings.TrimPrefix(path, "devices/"), "/") && r.Method == "PUT":
@@ -421,7 +443,14 @@ func (a *App) route(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(path, "devices/")
 		a.mu.Lock()
 		defer a.mu.Unlock()
-		next := State{Devices: []Device{}, History: a.state.History}
+		for _, task := range a.state.Tasks {
+			if task.DeviceID == id {
+				problem(w, 409, "设备仍关联定时任务，请先删除相关任务")
+				return
+			}
+		}
+		next := a.state
+		next.Devices = []Device{}
 		found := false
 		for _, d := range a.state.Devices {
 			if d.ID == id {
@@ -455,6 +484,8 @@ func (a *App) writeDevice(w http.ResponseWriter, r *http.Request, id string) {
 		Name    string `json:"name"`
 		MAC     string `json:"mac"`
 		Network string `json:"network"`
+		IP      string `json:"ip"`
+		OS      string `json:"os"`
 	}
 	if !decode(w, r, &input) {
 		return
@@ -484,9 +515,23 @@ func (a *App) writeDevice(w http.ResponseWriter, r *http.Request, id string) {
 		problem(w, 400, "所选网络接口已不可用，请重新选择")
 		return
 	}
+	input.IP = strings.TrimSpace(input.IP)
+	if input.IP != "" {
+		if _, ok := statusNetwork(input.IP, input.Network, networks); !ok {
+			problem(w, 400, "IP 地址需为所选 NAS 局域网内的有效 IPv4 设备地址")
+			return
+		}
+	}
+	switch input.OS {
+	case "", "windows", "macos", "linux", "other":
+	default:
+		problem(w, 400, "请选择支持的系统类型，或保留未指定")
+		return
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	next := State{Devices: append([]Device{}, a.state.Devices...), History: a.state.History}
+	next := a.state
+	next.Devices = append([]Device{}, a.state.Devices...)
 	index := -1
 	for i, d := range next.Devices {
 		if d.ID == id {
@@ -513,7 +558,7 @@ func (a *App) writeDevice(w http.ResponseWriter, r *http.Request, id string) {
 		}
 		id = hex.EncodeToString(bytes[:])
 	}
-	device := Device{ID: id, Name: input.Name, MAC: mac, Network: input.Network}
+	device := Device{ID: id, Name: input.Name, MAC: mac, Network: input.Network, IP: input.IP, OS: input.OS}
 	if index >= 0 {
 		next.Devices[index] = device
 	} else {
@@ -545,45 +590,14 @@ func (a *App) wake(w http.ResponseWriter, r *http.Request, id string) {
 		problem(w, 429, "发送过于频繁，请稍等 3 秒再试")
 		return
 	}
-	networks, err := a.networks()
-	if err != nil {
-		problem(w, 500, "无法读取 NAS 网络接口")
-		return
-	}
-	selected := []Network{}
-	for _, n := range networks {
-		if device.Network == "auto" || device.Network == n.ID {
-			selected = append(selected, n)
-		}
-	}
-	if len(selected) == 0 {
-		problem(w, 409, "没有可用的局域网接口，请检查 NAS 网络或编辑设备")
-		return
-	}
-	packet, _, err := magicPacket(device.MAC)
-	if err != nil {
-		problem(w, 400, err.Error())
+	event, failure := a.transmitWake(device, r.Context().Value(userContextKey{}).(User), time.Now())
+	if failure != nil {
+		problem(w, failure.Status, failure.Message)
 		return
 	}
 	a.lastWake = time.Now()
-	user := r.Context().Value(userContextKey{}).(User)
-	event := Event{Time: time.Now().UTC(), Name: device.Name, MAC: device.MAC, Targets: []string{}, Actor: &user}
-	errorsList := []string{}
-	for _, n := range selected {
-		count, err := a.send(packet, n, 9)
-		event.Sent += count
-		if count > 0 {
-			event.Targets = append(event.Targets, n.Name+" → "+n.Broadcast+":9")
-		}
-		if err != nil {
-			errorsList = append(errorsList, n.Name+": "+err.Error())
-		}
-	}
-	event.Error = strings.Join(errorsList, "; ")
-	next := State{Devices: a.state.Devices, History: append([]Event{event}, a.state.History...)}
-	if len(next.History) > 100 {
-		next.History = next.History[:100]
-	}
+	next := a.state
+	next.History = appendHistory(event, a.state.History)
 	logSaved := true
 	if err := a.save(next); err != nil {
 		logSaved = false
@@ -604,6 +618,59 @@ func (a *App) wake(w http.ResponseWriter, r *http.Request, id string) {
 	respond(w, status, map[string]any{"message": message, "event": event, "log_saved": logSaved})
 }
 
+type wakeFailure struct {
+	Status  int
+	Message string
+}
+
+// Caller holds a.mu. Manual and scheduled sends use exactly the same packet path.
+func (a *App) transmitWake(device Device, user User, now time.Time) (Event, *wakeFailure) {
+	event := Event{Time: now.UTC(), Name: device.Name, MAC: device.MAC, Targets: []string{}, Actor: &user}
+	networks, err := a.networks()
+	if err != nil {
+		return event, &wakeFailure{500, "无法读取 NAS 网络接口"}
+	}
+	selected := []Network{}
+	for _, n := range networks {
+		if device.Network == "auto" || device.Network == n.ID {
+			selected = append(selected, n)
+		}
+	}
+	if len(selected) == 0 {
+		return event, &wakeFailure{409, "没有可用的局域网接口，请检查 NAS 网络或编辑设备"}
+	}
+	packet, _, err := magicPacket(device.MAC)
+	if err != nil {
+		return event, &wakeFailure{400, err.Error()}
+	}
+	errorsList := []string{}
+	for _, n := range selected {
+		count, err := a.send(packet, n, 9)
+		event.Sent += count
+		if count > 0 {
+			event.Targets = append(event.Targets, n.Name+" → "+n.Broadcast+":9")
+		}
+		if err != nil {
+			errorsList = append(errorsList, n.Name+": "+err.Error())
+		}
+	}
+	event.Error = strings.Join(errorsList, "; ")
+	if event.Sent > 0 {
+		a.statusMu.Lock()
+		a.statusCachedAt = time.Time{}
+		a.statusMu.Unlock()
+	}
+	return event, nil
+}
+
+func appendHistory(event Event, history []Event) []Event {
+	result := append([]Event{event}, history...)
+	if len(result) > 100 {
+		result = result[:100]
+	}
+	return result
+}
+
 func main() {
 	port := flag.Int("port", 28089, "HTTP port")
 	bind := flag.String("bind", "127.0.0.1", "HTTP bind address")
@@ -622,11 +689,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	defer stopScheduler()
+	go a.runScheduler(schedulerCtx)
 	server := &http.Server{Addr: net.JoinHostPort(*bind, fmt.Sprint(*port)), Handler: a.handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 45 * time.Second, MaxHeaderBytes: 16 * 1024}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-stop
+		stopScheduler()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)

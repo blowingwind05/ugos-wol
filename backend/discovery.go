@@ -90,9 +90,12 @@ func readARP(r io.Reader, network Network, prefix netip.Prefix) ([]DiscoveredDev
 	seen := map[string]bool{}
 	unique := devices[:0]
 	for _, device := range devices {
-		if !seen[device.MAC] {
+		// A neighbour can have multiple IPv4 addresses, and old addresses can
+		// coexist with new ones. Do not drop candidates merely for sharing a MAC.
+		key := device.IP + "/" + device.MAC
+		if !seen[key] {
 			unique = append(unique, device)
-			seen[device.MAC] = true
+			seen[key] = true
 		}
 	}
 	return unique, nil
@@ -117,7 +120,7 @@ func arpSnapshot(network Network, prefix netip.Prefix) ([]DiscoveredDevice, erro
 	return nil, lastErr
 }
 
-func discoverLAN(ctx context.Context, network Network) (ScanResult, error) {
+func discoverNeighbours(ctx context.Context, network Network) (ScanResult, error) {
 	prefix, limited, err := discoveryRange(network)
 	result := ScanResult{Devices: []DiscoveredDevice{}, CIDR: prefix.String(), Limited: limited}
 	if err != nil {
@@ -172,9 +175,16 @@ func discoverLAN(ctx context.Context, network Network) (ScanResult, error) {
 	if err != nil {
 		return result, errors.New("无法读取扫描结果，请重试或手动填写 MAC 地址")
 	}
-	nameDiscoveredDevices(ctx, network, devices, lookupDeviceName)
 	result.Devices = devices
 	return result, nil
+}
+
+func discoverLAN(ctx context.Context, network Network) (ScanResult, error) {
+	result, err := discoverNeighbours(ctx, network)
+	if err == nil {
+		nameDiscoveredDevices(ctx, network, result.Devices, lookupDeviceName)
+	}
+	return result, err
 }
 
 func (a *App) scanLAN(w http.ResponseWriter, r *http.Request) {

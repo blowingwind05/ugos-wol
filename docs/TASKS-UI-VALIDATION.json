@@ -1,0 +1,20 @@
+{
+  "checks": [
+    "four aligned navigation entries including a library calendar icon",
+    "device selection, explicit NAS default timezone and five repeat options",
+    "workday task saves and displays its rule and next run",
+    "edit supports weekends, a custom clock time and a saved timezone",
+    "enable and disable updates server state without sending WOL",
+    "history refreshes on entry and identifies scheduled task triggers",
+    "custom weekdays require a selection and preserve selected days and time",
+    "one-shot date/time, past-time error and saving a disabled task",
+    "task names are escaped and scheduler/last-run errors remain visible",
+    "save failures preserve the editable task form",
+    "task cards, four mobile nav items and custom-day form fit down to 320px",
+    "task deletion supports cancel and confirm",
+    "no-device task creation routes to adding a device",
+    "authorization failure closes the task dialog"
+  ],
+  "pageErrors": [],
+  "validation": "Isolated Chrome with mocked UGOS SDK/API; no LAN or WOL packets sent."
+}
