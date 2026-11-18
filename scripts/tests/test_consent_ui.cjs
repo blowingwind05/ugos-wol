@@ -45,9 +45,27 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
 
 
   assert.equal(apiRequests,0);assert.equal(await page.frames()[1].evaluate(()=>window.sdkInitializations||0),0);assert(await f.locator('#consent-accept').isDisabled());
+  await page.keyboard.press('Escape');assert(await f.locator('#app').isHidden());assert.equal(apiRequests,0);assert.equal(await page.frames()[1].evaluate(()=>localStorage.getItem('ugos-wol-consent')),null);await f.locator('#retry-session').click();await f.locator('#consent-dialog').waitFor({state:'visible'});checks.push('Escape before first agreement does not grant consent or access APIs');
   await f.locator('#consent-decline').click();assert.equal(apiRequests,0);assert(await f.locator('#app').isHidden());await f.locator('#retry-session').click();await f.locator('#consent-dialog').waitFor({state:'visible'});checks.push('No SDK initialization, token acquisition or API requests before explicit agreement, including refusal');
   await f.locator('#consent-check').check();await f.locator('#consent-accept').click();await f.locator('#app').waitFor({state:'visible'});assert.equal(await page.frames()[1].evaluate(()=>window.sdkInitializations),1);assert(apiRequests>0);checks.push('Unchecked consent is required; agreement initializes SDK and enters existing login flow');
-  const frame=page.frames()[1];for(const file of ['about.html','privacy.html','agreement.html','permissions.html','help.html','support.html']){const r=await frame.evaluate(async path=>{const r=await fetch(path);return {status:r.status,html:await r.text()};},file);assert.equal(r.status,200);assert(r.html.includes('blowingwind'));}checks.push('Policy, license, permission details, help and support are available as local static pages');
+  const frame=page.frames()[1];
+  const accepted=await frame.evaluate(()=>localStorage.getItem('ugos-wol-consent'));
+  const callsBeforeReview={api:apiRequests,sdk:await frame.evaluate(()=>window.sdkInitializations),token:await frame.evaluate(()=>window.tokenCalls)};
+  for(const close of ['button','escape','title']){
+   await f.locator('[data-open-consent]').click();
+   assert(await f.locator('#consent-check').isHidden());assert(await f.locator('#consent-close').isVisible());assert.equal(await f.locator('#consent-accept').textContent(),'关闭');assert(await f.locator('#consent-accept').isEnabled());
+   if(close==='button')await f.locator('#consent-accept').click();else if(close==='title')await f.locator('#consent-close').click();else await page.keyboard.press('Escape');
+   assert(await f.locator('#consent-dialog').isHidden());assert(await f.locator('#app').isVisible());assert.equal(await frame.evaluate(()=>localStorage.getItem('ugos-wol-consent')),accepted);
+  }
+  assert.equal(apiRequests,callsBeforeReview.api);assert.equal(await frame.evaluate(()=>window.sdkInitializations),callsBeforeReview.sdk);assert.equal(await frame.evaluate(()=>window.tokenCalls),callsBeforeReview.token);
+  checks.push('Review closes by button, Escape or title control without repeated consent, changed acceptance time or new SDK/API activity');
+  const reviewPage=await browser.newPage({viewport:{width:390,height:820}});
+  await reviewPage.route('**/api/wol/v1/**',route=>route.fulfill({json:route.request().url().endsWith('/info')?info:{devices:[]}}));
+  await reviewPage.addInitScript(value=>localStorage.setItem('ugos-wol-consent',value),accepted);
+  await reviewPage.goto(`http://127.0.0.1:${server.address().port}/host`);const rf=reviewPage.frameLocator('iframe');await rf.locator('#app').waitFor({state:'visible'});assert(await rf.locator('#consent-dialog').isHidden());
+  await rf.locator('[data-open-consent]').click();assert(await reviewPage.frames()[1].evaluate(()=>['consent-accept','consent-decline','consent-close'].every(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})));await reviewPage.screenshot({path:path.join(repo,'docs/assets/consent-review-mobile.png')});await reviewPage.keyboard.press('Escape');assert(await rf.locator('#app').isVisible());await reviewPage.close();
+  checks.push('A stored current agreement opens a new session without a consent prompt, including mobile review and Escape');
+  for(const file of ['about.html','privacy.html','agreement.html','permissions.html','help.html','support.html']){const r=await frame.evaluate(async path=>{const r=await fetch(path);return {status:r.status,html:await r.text()};},file);assert.equal(r.status,200);assert(r.html.includes('blowingwind'));}checks.push('Policy, license, permission details, help and support are available as local static pages');
   await f.locator('[data-open-consent]').click();await f.locator('#consent-decline').click();assert(await f.locator('#app').isHidden());assert.equal(await frame.evaluate(()=>localStorage.getItem('ugos-wol-consent')),null);const stopped=apiRequests;await page.waitForTimeout(1200);assert.equal(apiRequests,stopped);checks.push('Withdrawal clears local consent and stops subsequent frontend API access');
   // A token obtained after withdrawal must never be used for a new backend request.
   await frame.evaluate(()=>{window.delayToken=true;});
@@ -61,6 +79,10 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
   await f.locator('#retry-session').click();await f.locator('#consent-check').check();await f.locator('#consent-accept').click();await f.locator('#session-message').filter({hasText:'无法确认管理员角色'}).waitFor();await f.locator('#download-diagnostic').waitFor({state:'visible'});
   const [download]=await Promise.all([page.waitForEvent('download'),f.locator('#download-diagnostic').click()]);const diagnostic=JSON.parse(fs.readFileSync(await download.path(),'utf8'));assert.equal(diagnostic.code,'UGOS_ROLE_UNAVAILABLE');assert.equal(diagnostic.details.admin_group_available,false);assert(!JSON.stringify(diagnostic).includes('fixture-token'));checks.push('Firmware compatibility errors can be downloaded as a diagnostic JSON without tokens');
   await frame.evaluate(()=>document.getElementById('consent-dialog').showModal());await f.locator('#consent-decline').click();await page.setViewportSize({width:320,height:700});await f.locator('#retry-session').click();assert(await frame.evaluate(()=>{const e=document.getElementById('consent-dialog'),r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.scrollWidth<=e.clientWidth}));await page.screenshot({path:path.join(repo,'docs/assets/consent-mobile.png')});checks.push('Consent and legal links fit a 320px mobile viewport');
+  const outdated=await browser.newPage();let outdatedRequests=0;
+  await outdated.addInitScript(()=>localStorage.setItem('ugos-wol-consent',JSON.stringify({version:'old-policy',accepted:true})));
+  await outdated.route('**/api/wol/v1/**',route=>{outdatedRequests++;return route.fulfill({json:info});});
+  await outdated.goto(`http://127.0.0.1:${server.address().port}/host`);const of=outdated.frameLocator('iframe');await of.locator('#consent-dialog').waitFor({state:'visible'});assert(await of.locator('#consent-check').isVisible());assert(await of.locator('#consent-accept').isDisabled());assert.equal(outdatedRequests,0);assert.equal(await outdated.frames()[1].evaluate(()=>window.sdkInitializations||0),0);await outdated.close();checks.push('An outdated policy version still requires explicit unchecked agreement before SDK/API use');
   assert.equal(wakes,0);assert.deepEqual(errors,[]);const report={checks,pageErrors:errors,validation:'Actual frontend with mocked UGOS SDK/API; no LAN or WOL packets.'};fs.writeFileSync(path.join(repo,'docs/CONSENT-UI-VALIDATION.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
  }finally{await browser.close();await new Promise(r=>server.close(r));fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});

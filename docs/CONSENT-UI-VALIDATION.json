@@ -1,12 +1,16 @@
 {
   "checks": [
+    "Escape before first agreement does not grant consent or access APIs",
     "No SDK initialization, token acquisition or API requests before explicit agreement, including refusal",
     "Unchecked consent is required; agreement initializes SDK and enters existing login flow",
+    "Review closes by button, Escape or title control without repeated consent, changed acceptance time or new SDK/API activity",
+    "A stored current agreement opens a new session without a consent prompt, including mobile review and Escape",
     "Policy, license, permission details, help and support are available as local static pages",
     "Withdrawal clears local consent and stops subsequent frontend API access",
     "A delayed SDK token returned after withdrawal cannot start an API request",
     "Firmware compatibility errors can be downloaded as a diagnostic JSON without tokens",
-    "Consent and legal links fit a 320px mobile viewport"
+    "Consent and legal links fit a 320px mobile viewport",
+    "An outdated policy version still requires explicit unchecked agreement before SDK/API use"
   ],
   "pageErrors": [],
   "validation": "Actual frontend with mocked UGOS SDK/API; no LAN or WOL packets."
