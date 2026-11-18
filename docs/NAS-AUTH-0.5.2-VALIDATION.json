@@ -1,0 +1,29 @@
+{
+  "version": "0.5.2.0001",
+  "date": "2026-11-18",
+  "scope": "One amd64 UGOS NAS; real application-center API upload/upgrade, then real third-party-token gateway requests. No physical mobile-client UI or ordinary-account login test.",
+  "checks": {
+    "official_linux_ugcli_dual_arch_packages": true,
+    "app_center_upload_and_upgrade": true,
+    "installed_version": "0.5.2.0001",
+    "package_access_list": [
+      "admin",
+      "users"
+    ],
+    "independent_non_root_user": true,
+    "default_readonly_root": true,
+    "old_go_and_group_overrides_removed": true,
+    "host_group_file_not_visible": true,
+    "service_running_after_restart": true,
+    "real_gateway_token_without_role": 200,
+    "anonymous_gateway_request": 401,
+    "forged_identity_headers_gateway_request": 401,
+    "existing_empty_configuration_preserved": true
+  },
+  "limits": [
+    "No claim that the market reviewers encountered the same cause.",
+    "ARM64 package metadata/ELF verified, not hardware-tested.",
+    "No real WOL packets or LAN discovery performed.",
+    "No full uninstall/reinstall test or populated-data migration claim."
+  ]
+}
