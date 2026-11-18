@@ -20,7 +20,7 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
  try{
   const page=await browser.newPage({viewport:{width:1600,height:900}});page.on('pageerror',e=>errors.push(e.message));await page.route('**/icons*.svg*',route=>route.abort());
   const network={id:'eth0/192.168.1.0/24',name:'eth0',ip:'192.168.1.2',cidr:'192.168.1.0/24',broadcast:'192.168.1.255'};
-  const info={version:'0.5.0',devices:['windows','macos','linux',''].map((system,i)=>({id:String(i),name:['办公电脑','设计工作站','Linux 服务器','其他电脑'][i],mac:`02:11:22:33:44:0${i}`,network:'auto',os:system,ip:i?'':`192.168.1.20`})),networks:[network],history:[]};
+  const info={version:'0.5.1',devices:['windows','macos','linux',''].map((system,i)=>({id:String(i),name:['办公电脑','设计工作站','Linux 服务器','其他电脑'][i],mac:`02:11:22:33:44:0${i}`,network:'auto',os:system,ip:i?'':`192.168.1.20`})),networks:[network],history:[]};
   let statusMode='normal',posted,checksCount=0,wakes=0;
   await page.route('**/api/wol/v1/**',async route=>{
    const req=route.request(),key=new URL(req.url()).pathname.split('/v1/')[1];assert.equal(req.headers()['ugreen-ttk'],'fixture-token');
@@ -38,9 +38,9 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
    if(key.startsWith('wake/')){wakes++;return route.fulfill({json:{event:{sent:3},log_saved:true,message:'唤醒包已发送'}});}
    return route.fulfill({status:404,json:{error:'unknown'}});
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}/host`);const f=page.frameLocator('iframe');
+  await page.addInitScript(()=>localStorage.setItem('ugos-wol-consent',JSON.stringify({version:'2026-11-17',accepted:true})));await page.goto(`http://127.0.0.1:${server.address().port}/host`);const f=page.frameLocator('iframe');
   await f.locator('.device-status.online').waitFor();assert.equal(await f.locator('.device-status.unresponsive').count(),1);assert.equal(await f.locator('.device-status.unknown').count(),2);checks.push('online, unresponsive and unknown remain distinct');
-  assert((await f.locator('.device-status.online').first().getAttribute('title')).includes('无线中继'));await f.locator('.device-status.online').first().click();assert((await f.locator('#toast svg').getAttribute('data-icon')).endsWith('info-20'));assert.equal(await f.locator('.sidebar-bottom').innerText(),'v0.5.0');checks.push('explicit IP status works through a relay, details use an info icon, and version is 0.5.0');
+  assert((await f.locator('.device-status.online').first().getAttribute('title')).includes('无线中继'));await f.locator('.device-status.online').first().click();assert((await f.locator('#toast svg').getAttribute('data-icon')).endsWith('info-20'));assert.equal(await f.locator('.sidebar-bottom').innerText(),'v0.5.1');checks.push('explicit IP status works through a relay, details use an info icon, and version is 0.5.1');
   const icons=await f.locator('.device-art').evaluateAll(ns=>ns.map(n=>({href:n.getAttribute('data-icon'),width:n.getBBox().width,height:n.getBBox().height})));
   assert(icons.every(n=>n.width>0&&n.height>0));assert(icons[0].href.endsWith('os_windows-20'));assert(icons[1].href.endsWith('os_apple-20'));assert(icons[2].href.endsWith('os_linux-20'));assert(icons[3].href.endsWith('laptop-48'));checks.push('inline OS icons render with external sprites blocked; unspecified systems retain original artwork');
   await page.screenshot({path:path.join(repo,'docs/assets/status-desktop.png'),fullPage:true});

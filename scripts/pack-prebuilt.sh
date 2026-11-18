@@ -10,10 +10,16 @@ UGCLI_TOOL="${UGCLI_TOOL:-ugcli}"
 command -v "$UGCLI_TOOL" >/dev/null || { echo '未找到官方 ugcli，请通过 UGCLI_TOOL 指定路径。' >&2; exit 1; }
 for target_arch in "${WOL_ARCHES[@]}"; do
   test -s "packaging/rootfs_${target_arch}/bin/wol" || { echo "缺少 $target_arch 程序，请先运行 scripts/build-binaries.sh。" >&2; exit 1; }
+  find "packaging/rootfs_${target_arch}" -type d -exec chmod 755 {} +
   chmod 755 "packaging/rootfs_${target_arch}/bin/wol"
 done
-chmod 644 packaging/project.yaml packaging/rootfs_common/icon.png packaging/rootfs_common/www/*
+# Common rootfs contains the public frontend, icon and license files.
+find packaging/rootfs_common -type d -exec chmod 755 {} +
+find packaging/rootfs_common -type f -exec chmod 644 {} +
+chmod 644 packaging/project.yaml
 (
+  # ugcli stages files under the current umask. Keep packaged assets readable.
+  umask 022
   cd packaging
   "$UGCLI_TOOL" check
   for target_arch in "${WOL_ARCHES[@]}"; do

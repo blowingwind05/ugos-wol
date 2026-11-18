@@ -20,7 +20,7 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
  try{
   const page=await browser.newPage({viewport:{width:1440,height:960}});page.on('pageerror',e=>errors.push(e.message));await page.route('**/icons*.svg*',route=>route.abort());
   const network={id:'eth0/192.168.1.0/24',name:'eth0',ip:'192.168.1.2',cidr:'192.168.1.0/24',broadcast:'192.168.1.255'};
-  const info={version:'0.5.0',devices:[{id:'pc',name:'办公电脑',mac:'02:11:22:33:44:55',network:'auto'}],tasks:[],history:[],networks:[network],default_timezone:'Asia/Shanghai',server_time:new Date().toISOString()};
+  const info={version:'0.5.1',devices:[{id:'pc',name:'办公电脑',mac:'02:11:22:33:44:55',network:'auto'}],tasks:[],history:[],networks:[network],default_timezone:'Asia/Shanghai',server_time:new Date().toISOString()};
   let posted,mode='normal',serial=0,wakes=0;
   const inputFor=body=>({...body,name:body.name||'办公电脑定时唤醒',date:body.repeat==='once'?body.date:undefined,weekdays:{daily:[1,2,3,4,5,6,7],weekdays:[1,2,3,4,5],weekends:[6,7]}[body.repeat]||body.weekdays});
   await page.route('**/api/wol/v1/**',async route=>{
@@ -41,7 +41,7 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
    }
    return route.fulfill({status:404,json:{error:'unknown'}});
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}/host`);const f=page.frameLocator('iframe');await f.locator('#app').waitFor({state:'visible'});
+  await page.addInitScript(()=>localStorage.setItem('ugos-wol-consent',JSON.stringify({version:'2026-11-17',accepted:true})));await page.goto(`http://127.0.0.1:${server.address().port}/host`);const f=page.frameLocator('iframe');await f.locator('#app').waitFor({state:'visible'});
 
   const choose=async(id,label)=>{await f.locator('#'+id+'-control').click();await f.locator('.control-popup [role=option]').filter({hasText:label}).first().click();};
   await f.locator('#add-device').click();await choose('device-os','Linux');assert.equal(await f.locator('#device-os').inputValue(),'linux');

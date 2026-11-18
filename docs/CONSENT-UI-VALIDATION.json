@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "No SDK initialization, token acquisition or API requests before explicit agreement, including refusal",
+    "Unchecked consent is required; agreement initializes SDK and enters existing login flow",
+    "Policy, license, permission details, help and support are available as local static pages",
+    "Withdrawal clears local consent and stops subsequent frontend API access",
+    "A delayed SDK token returned after withdrawal cannot start an API request",
+    "Firmware compatibility errors can be downloaded as a diagnostic JSON without tokens",
+    "Consent and legal links fit a 320px mobile viewport"
+  ],
+  "pageErrors": [],
+  "validation": "Actual frontend with mocked UGOS SDK/API; no LAN or WOL packets."
+}

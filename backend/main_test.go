@@ -384,3 +384,34 @@ func TestLegacyGatewayRoleUsesAdministratorGroup(t *testing.T) {
 		t.Fatalf("modern role incorrectly requires group file: %d", code)
 	}
 }
+
+// Diagnostic output must help identify incompatible firmware without exposing identity values.
+func TestRoleUnavailableDiagnostic(t *testing.T) {
+	a := fixture(t)
+	a.groupFile = filepath.Join(t.TempDir(), "absent")
+	r := httptest.NewRequest("GET", api+"info", nil)
+	r.RemoteAddr = "127.0.0.1:1000"
+	r.Header.Set("Ugreen-User-ID", "private-user-id")
+	r.Header.Set("Ugreen-User-Name", "private-user-name")
+	r.Header.Set("Ugreen-Ttk", "private-token")
+	w := httptest.NewRecorder()
+	a.handler().ServeHTTP(w, r)
+	if w.Code != 503 {
+		t.Fatalf("status %d", w.Code)
+	}
+	var result struct {
+		Code       string         `json:"code"`
+		Diagnostic map[string]any `json:"diagnostic"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Code != "UGOS_ROLE_UNAVAILABLE" || result.Diagnostic["admin_group_available"] != false || result.Diagnostic["role_header_count"] != float64(0) {
+		t.Fatalf("invalid diagnostic: %s", w.Body)
+	}
+	for _, secret := range []string{"private-user-id", "private-user-name", "private-token"} {
+		if strings.Contains(w.Body.String(), secret) {
+			t.Fatalf("diagnostic leaked %s", secret)
+		}
+	}
+}

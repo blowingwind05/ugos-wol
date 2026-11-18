@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -53,9 +54,9 @@ if sys.argv[1] == 'pack':
                         UGCLI_TOOL=str(self.tool), UPK_OUTPUT_DIR=str(self.output),
                         BUILD_NUMBER="7", TARGET_ARCH="all", WOL_TEST_LOG=str(self.root / "calls.jsonl"))
 
-    def run_script(self, name, **environment):
+    def run_script(self, name, *, umask=-1, **environment):
         return subprocess.run(["bash", f"scripts/{name}"], cwd=self.root,
-                              env=dict(self.env, **environment), capture_output=True, text=True)
+                              env=dict(self.env, **environment), capture_output=True, text=True, umask=umask)
 
     def test_both_architectures_are_packed_and_exported(self):
         result = self.run_script("pack-prebuilt.sh")
@@ -64,6 +65,35 @@ if sys.argv[1] == 'pack':
         self.assertFalse(list((self.root / "packaging/build_dir/pkgs/upk").glob("*.upk")))
         calls = [json.loads(line) for line in (self.root / "calls.jsonl").read_text().splitlines()]
         self.assertEqual([call[call.index("--arch") + 1] for call in calls if call[0] == "pack"], ["amd64", "arm64"])
+
+    def test_restrictive_creation_permissions_are_normalized_before_packaging(self):
+        rootfs = self.root / "packaging/rootfs_common"
+        license_file = rootfs / "licenses/nested/notice.txt"
+        license_file.parent.mkdir(parents=True)
+        license_file.write_text("license fixture")
+        for directory in [rootfs, *rootfs.rglob("*"),
+                          self.root / "packaging/rootfs_amd64",
+                          self.root / "packaging/rootfs_amd64/bin",
+                          self.root / "packaging/rootfs_arm64",
+                          self.root / "packaging/rootfs_arm64/bin"]:
+            if directory.is_dir():
+                directory.chmod(0o700)
+        for file in rootfs.rglob("*"):
+            if file.is_file():
+                file.chmod(0o600)
+
+        result = self.run_script("pack-prebuilt.sh", umask=0o077)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for file in rootfs.rglob("*"):
+            expected_mode = 0o755 if file.is_dir() else 0o644
+            self.assertEqual(stat.S_IMODE(file.stat().st_mode), expected_mode, str(file))
+        self.assertEqual(stat.S_IMODE(rootfs.stat().st_mode), 0o755)
+        for arch in ("amd64", "arm64"):
+            for relative in ("", "bin", "bin/wol"):
+                file = self.root / f"packaging/rootfs_{arch}" / relative
+                self.assertEqual(stat.S_IMODE(file.stat().st_mode), 0o755, str(file))
+        for package in self.output.glob("*.upk"):
+            self.assertEqual(stat.S_IMODE(package.stat().st_mode), 0o644)
 
     def test_single_target_is_not_confused_with_host_architecture(self):
         result = self.run_script("pack-prebuilt.sh", TARGET_ARCH="arm64")

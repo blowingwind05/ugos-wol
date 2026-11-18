@@ -30,7 +30,7 @@ import (
 var assets embed.FS
 
 const api = "/api/wol/v1/"
-const version = "0.5.0"
+const version = "0.5.1"
 
 type User struct {
 	ID   string `json:"id"`
@@ -341,7 +341,7 @@ func (a *App) gatewayUser(w http.ResponseWriter, r *http.Request) (User, bool) {
 		// Require a separate server-side administrator membership check.
 		admin, err := a.localAdministrator(user.Name)
 		if err != nil {
-			problem(w, 503, "该固件未提供用户角色，暂时无法读取 NAS 管理员组，请检查应用兼容配置")
+			respond(w, 503, map[string]any{"error": "该固件未提供用户角色，且应用隔离环境无法确认管理员身份，请联系开发者核对固件兼容性", "code": "UGOS_ROLE_UNAVAILABLE", "diagnostic": map[string]any{"app_version": version, "id_header_count": len(r.Header.Values("Ugreen-User-ID")), "name_header_count": len(r.Header.Values("Ugreen-User-Name")), "role_header_count": len(roles), "admin_group_available": false}})
 			return User{}, false
 		}
 		if admin {

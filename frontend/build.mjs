@@ -42,6 +42,7 @@ const inlineHTML = template.replace(/<svg\b([^>]*)>\s*<use\s+href="\.\/icons\.sv
 if (inlineHTML.includes('<use')) throw new Error('Unexpected SVG use element in built HTML');
 const html = inlineHTML.replace(/\.\/(icon\.svg|style\.css|app\.js)(?:\?[^"'#\s<>]*)?/g,(_,file)=>`./${names[file]}`);
 const output = new Map([['index.html',Buffer.from(html)]]);
+for(const file of await readdir(path.join(root,'legal'))){if(file==='index.html')continue;if(/\.(html|css)$/.test(file))output.set(file,await readFile(path.join(root,'legal',file)));}
 for (const [file,data] of Object.entries(resources)) {
   output.set(file,data); // Stable aliases for older already-open documents.
   output.set(names[file],data);

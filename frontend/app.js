@@ -1,6 +1,7 @@
-import UGOSCore from '@ugreen-nas/core';
-import cloudWindow from '@ugreen-nas/core/cloudWindow';
 import iconDefinitions from './icon-data.js';
+import {hasConsent,showConsent,initConsent} from './consent.js';
+let UGOSCore,cloudWindow;
+const requestControllers=new Set();
 import {initControls,syncControls,closeControls,normalizeClock,validateTaskDate,zoneLabel} from './controls.js';
 
 const $ = (id) => document.getElementById(id);
@@ -8,6 +9,7 @@ const iconTemplates = new Map();
 let connected = false, thirdToken = '', initialized = false, editing = '';
 let model = {devices: [], history: [], networks: []};
 let toastTimer;
+let lastDiagnostic=null;
 let scanController = null, scanSerial = 0, scanSuggestedName = '';
 const wakeStates = new Map();
 const deviceStatuses = new Map(), wakeWatches = new Map();
@@ -31,29 +33,34 @@ function icon(name) {
 function message(value, warning = false, glyph) { $('toast-message').textContent = value; setIcon($('toast').querySelector('svg'),`${glyph || (warning ? 'warning' : 'checkmark_circle')}-20`); $('toast').classList.toggle('warning', warning); $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 7500); }
 function formatTime(time) { return new Date(time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); }
 async function token(force = false) {
+  if(!hasConsent())throw new Error('请先阅读并同意隐私政策和用户许可协议');
   if (!embedded) throw new Error('请从已登录的 UGOS 桌面或绿联客户端中打开本应用');
   if (thirdToken && !force) return thirdToken;
   if (!initialized) {
+    if(!UGOSCore){const m=await Promise.all([import('@ugreen-nas/core'),import('@ugreen-nas/core/cloudWindow')]);UGOSCore=m[0].default;cloudWindow=m[1].default;}
+    if(!hasConsent())throw new Error('本端尚未同意隐私与许可');
     await Promise.race([UGOSCore.init(), new Promise((_,reject) => setTimeout(() => reject(new Error('绿联应用初始化超时，请重新打开应用')), 6000))]);
     initialized = true;
   }
+  if(!hasConsent())throw new Error('本端尚未同意隐私与许可');
   const info = await cloudWindow.useCapacity('getThirdToken', undefined, 6000);
+  if(!hasConsent())throw new Error('本端尚未同意隐私与许可');
   if (!info?.third_token) throw new Error('无法获取绿联登录令牌，请从 UGOS 桌面重新打开应用');
   thirdToken = info.third_token;
   return thirdToken;
 }
 async function request(path, method = 'GET', body, retry = true, signal) {
   const headers = {};
-  const ttk = await token(); if (ttk) headers['Ugreen-Ttk'] = ttk;
+  const ttk = await token(); if(!hasConsent())throw new Error('本端尚未同意隐私与许可'); if (ttk) headers['Ugreen-Ttk'] = ttk;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (signal?.aborted) throw new DOMException('请求已取消','AbortError');
   const controller = new AbortController(), abort = () => controller.abort();
   signal?.addEventListener('abort',abort,{once:true});
-  const timeout = setTimeout(abort,15000);
+  const timeout = setTimeout(abort,15000);requestControllers.add(controller);
   let response;
   try { response = await fetch(`/api/wol/v1/${path}`, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), credentials:'same-origin', signal:controller.signal}); }
   catch { if (signal?.aborted) throw new DOMException('请求已取消','AbortError'); throw new Error('无法连接唤醒服务，请重试'); }
-  finally { clearTimeout(timeout); signal?.removeEventListener('abort',abort); }
+  finally { clearTimeout(timeout);requestControllers.delete(controller); signal?.removeEventListener('abort',abort); }
   if (response.status === 401 && embedded && retry) { await token(true); return request(path,method,body,false,signal); }
   let data;
   try { data = await response.json(); } catch {
@@ -63,7 +70,7 @@ async function request(path, method = 'GET', body, retry = true, signal) {
   }
   if (!response.ok) {
     const error = new Error(data.error || data.message || `请求失败 (${response.status})`);
-    error.status = response.status; error.event = data.event;
+    error.status = response.status; error.event = data.event;error.code=data.code;error.diagnostic=data.diagnostic;
     throw error;
   }
   return data;
@@ -104,6 +111,8 @@ function refreshStatuses() {
   return statusPromise;
 }
 function sessionFailed(error) {
+  lastDiagnostic={application:'ugos-wol',version:'0.5.1',time:new Date().toISOString(),status:error.status||null,code:error.code||'SESSION_FAILED',message:error.message,details:error.diagnostic||null};
+  $('download-diagnostic').hidden=false;
   connected = false; thirdToken = '';
   wakeWatches.clear(); deviceStatuses.clear();
   for (const id of ['device-dialog','delete-dialog','task-dialog','delete-task-dialog']) if ($(id).open) $(id).close();
@@ -115,8 +124,10 @@ function sessionFailed(error) {
 }
 async function handle(action) { try { await action(); } catch (error) { if (error.status === 401 || error.status === 403) sessionFailed(error); message(error.message,true); } }
 async function startSession() {
+  if(!hasConsent()){showConsent();return;}
+  $('retry-session').textContent='重新连接';
   $('retry-session').disabled = true; $('session-title').textContent = '正在连接 NAS'; $('session-message').textContent = '正在验证当前 UGOS 登录身份…';
-  try { await refresh(); connected = true; $('session-screen').hidden = true; $('app').hidden = false; }
+  try { await refresh(); if(!hasConsent())return;connected = true; $('session-screen').hidden = true; $('app').hidden = false; }
   catch (error) { sessionFailed(error); }
   finally { $('retry-session').disabled = false; }
 }
@@ -449,5 +460,14 @@ function deleteTask(task) {
 }
 $('refresh-tasks').addEventListener('click',()=>handle(async()=>{$('refresh-tasks').disabled=true;try{await refresh();}finally{$('refresh-tasks').disabled=false;}}));
 setInterval(()=>{if(connected&&!document.hidden&&(!$('view-tasks').hidden||!$('view-history').hidden))handle(refresh);},10000);
+$('download-diagnostic').addEventListener('click',()=>{if(!lastDiagnostic)return;const url=URL.createObjectURL(new Blob([JSON.stringify(lastDiagnostic,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='ugos-wol-diagnostic.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 initControls(icon);
+initConsent(()=>{if(!connected)startSession();},()=>{
+  connected=false;thirdToken='';wakeWatches.clear();deviceStatuses.clear();
+  for(const controller of requestControllers)controller.abort();
+  for(const id of ['device-dialog','task-dialog','delete-dialog','delete-task-dialog'])if($(id).open)$(id).close();
+  $('app').hidden=true;$('session-screen').hidden=false;$('session-title').textContent='尚未同意隐私与许可';
+  $('session-message').textContent='本端已停止访问应用数据。已启用的 NAS 后台任务不会因此取消，可重新阅读后进入应用管理。';
+  $('retry-session').textContent='重新阅读';$('retry-session').hidden=false;
+});
 startSession();
