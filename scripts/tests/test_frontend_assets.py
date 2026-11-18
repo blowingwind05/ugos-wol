@@ -57,7 +57,7 @@ class FrontendAssetsTest(unittest.TestCase):
         references = re.findall(r'data-icon="([^"]+)"', html)
         self.assertTrue(references)
         self.assertTrue(set(references).issubset(symbols))
-        self.assertIn("v0.5.1", html)
+        self.assertIn("v" + json.loads((self.root / "frontend/package.json").read_text())["version"], html)
         return urls
 
     def test_stale_precompressed_assets_are_replaced(self):

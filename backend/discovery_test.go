@@ -87,7 +87,7 @@ incomplete row
 	}
 }
 
-func TestDiscoveryRequiresAdminAndCurrentInterface(t *testing.T) {
+func TestDiscoveryRequiresIdentityAndCurrentInterface(t *testing.T) {
 	a := fixture(t)
 	calls := 0
 	a.discover = func(ctx context.Context, n Network) (ScanResult, error) {
@@ -105,7 +105,7 @@ func TestDiscoveryRequiresAdminAndCurrentInterface(t *testing.T) {
 		identity, body string
 		status         int
 	}{
-		{"", valid, 401}, {"users", valid, 403}, {"admin", `{"network":"8.8.8.8"}`, 400},
+		{"", valid, 401}, {"admin", `{"network":"8.8.8.8"}`, 400},
 		{"admin", `{"network":"auto"}`, 400}, {"admin", `{"network":"eth0;touch /tmp/unwanted"}`, 400},
 		{"admin", `{"network":"` + testNetwork.ID + `","cidr":"8.8.8.0/24"}`, 400}, {"admin", `{} {}`, 400},
 	} {
@@ -117,7 +117,7 @@ func TestDiscoveryRequiresAdminAndCurrentInterface(t *testing.T) {
 		t.Fatal("unauthorized or arbitrary target discovery ran")
 	}
 	before, _ := json.Marshal(a.state)
-	if status, body := call(t, a, "POST", "scan", valid, "admin"); status != 200 || !strings.Contains(string(body), `"devices":[]`) {
+	if status, body := call(t, a, "POST", "scan", valid, "users"); status != 200 || !strings.Contains(string(body), `"devices":[]`) {
 		t.Fatal(status, string(body))
 	}
 	if status, _ := call(t, a, "POST", "scan", valid, "admin"); status != 429 || calls != 1 {

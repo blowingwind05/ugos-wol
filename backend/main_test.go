@@ -25,10 +25,6 @@ func fixture(t *testing.T) *App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.groupFile = filepath.Join(t.TempDir(), "group")
-	if err := os.WriteFile(a.groupFile, []byte("admin:x:10:测试管理员,管理员\nusers:x:100:普通用户\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
 	a.networks = func() ([]Network, error) { return []Network{testNetwork}, nil }
 	a.send = func(packet []byte, n Network, port int) (int, error) {
 		if n.Broadcast != "192.168.13.255" || port != 9 || len(packet) != 102 {
@@ -143,8 +139,8 @@ func TestGatewayIdentityAndPermissions(t *testing.T) {
 		want                       int
 	}{
 		{"no identity", "127.0.0.1:1234", "", "", "", false, 401},
-		{"ordinary user", "127.0.0.1:1234", "101", "普通用户", "users", false, 403},
-		{"unknown role", "127.0.0.1:1234", "101", "普通用户", "superadmin", false, 403},
+		{"ordinary user", "127.0.0.1:1234", "101", "普通用户", "users", false, 200},
+		{"unknown role", "127.0.0.1:1234", "101", "普通用户", "superadmin", false, 200},
 		{"missing ID", "127.0.0.1:1234", "", "管理员", "admin", false, 401},
 		{"empty name", "127.0.0.1:1234", "100", "", "admin", false, 401},
 		{"duplicate ID", "127.0.0.1:1234", "100", "管理员", "admin", true, 401},
@@ -178,8 +174,11 @@ func TestGatewayIdentityAndPermissions(t *testing.T) {
 			if w.Code != tc.want {
 				t.Fatalf("want %d, got %d: %s", tc.want, w.Code, w.Body.String())
 			}
-			if w.Code == 200 && !strings.Contains(w.Body.String(), `"user":{"id":"100","name":"管理员","role":"admin"}`) {
-				t.Fatal(w.Body.String())
+			if w.Code == 200 {
+				var result struct{ User User }
+				if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || result.User.ID != tc.id || result.User.Name != tc.user || result.User.Role != "" {
+					t.Fatalf("identity changed or role inferred: %s", w.Body.String())
+				}
 			}
 		})
 	}
@@ -327,89 +326,53 @@ func TestStaticUIAndJSONBodyLimit(t *testing.T) {
 	}
 }
 
-func TestLegacyGatewayRoleUsesAdministratorGroup(t *testing.T) {
-	a := fixture(t)
-	check := func(name string, id string, role *string) int {
-		r := httptest.NewRequest("GET", api+"info", nil)
-		r.RemoteAddr = "127.0.0.1:1234"
-		if id != "" {
-			r.Header.Set("Ugreen-User-ID", id)
-		}
-		r.Header.Set("Ugreen-User-Name", name)
-		if role != nil {
-			r.Header.Set("Ugreen-User-Type", *role)
-		}
-		w := httptest.NewRecorder()
-		a.handler().ServeHTTP(w, r)
-		return w.Code
-	}
-	if code := check("测试管理员", "100", nil); code != 200 {
-		t.Fatalf("legacy admin: %d", code)
-	}
-	if code := check("普通用户", "101", nil); code != 403 {
-		t.Fatalf("legacy ordinary user: %d", code)
-	}
-	if code := check("测试管理", "102", nil); code != 403 {
-		t.Fatalf("partial name matched: %d", code)
-	}
-	if code := check("测试管理员", "", nil); code != 401 {
-		t.Fatalf("name only authorized: %d", code)
-	}
-	role := "users"
-	if code := check("测试管理员", "100", &role); code != 403 {
-		t.Fatalf("explicit ordinary role overridden: %d", code)
-	}
-	role = ""
-	if code := check("测试管理员", "100", &role); code != 401 {
-		t.Fatalf("empty role accepted: %d", code)
-	}
-	if err := os.WriteFile(a.groupFile, []byte("admin:x:10:\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if code := check("测试管理员", "100", nil); code != 403 {
-		t.Fatalf("removed group member accepted: %d", code)
-	}
-	if err := os.WriteFile(a.groupFile, []byte("admin:x:10:测试管理员\nadmin:x:10:普通用户\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if code := check("测试管理员", "100", nil); code != 503 {
-		t.Fatalf("ambiguous group accepted: %d", code)
-	}
-	a.groupFile = filepath.Join(t.TempDir(), "absent")
-	if code := check("测试管理员", "100", nil); code != 503 {
-		t.Fatalf("missing group file accepted: %d", code)
-	}
-	role = "admin"
-	if code := check("测试管理员", "100", &role); code != 200 {
-		t.Fatalf("modern role incorrectly requires group file: %d", code)
+func TestAuthenticatedIdentityDoesNotDependOnRoleOrHostGroups(t *testing.T) {
+	for _, role := range []string{"", "admin", "users", "future-role"} {
+		t.Run(role, func(t *testing.T) {
+			a := fixture(t)
+			r := httptest.NewRequest("POST", api+"devices", strings.NewReader(`{"name":"共享设备","mac":"02:11:22:33:44:55","network":"auto"}`))
+			r.RemoteAddr = "127.0.0.1:1234"
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("Ugreen-User-ID", "101")
+			r.Header.Set("Ugreen-User-Name", "已登录用户")
+			if role != "" {
+				r.Header.Set("Ugreen-User-Type", role)
+			}
+			w := httptest.NewRecorder()
+			a.handler().ServeHTTP(w, r)
+			if w.Code != 200 {
+				t.Fatalf("authenticated user rejected: %d %s", w.Code, w.Body.String())
+			}
+			if len(a.state.Devices) != 1 {
+				t.Fatal("shared device was not saved")
+			}
+		})
 	}
 }
 
-// Diagnostic output must help identify incompatible firmware without exposing identity values.
-func TestRoleUnavailableDiagnostic(t *testing.T) {
+func TestMissingIdentityDiagnosticDoesNotExposeCredentials(t *testing.T) {
 	a := fixture(t)
-	a.groupFile = filepath.Join(t.TempDir(), "absent")
 	r := httptest.NewRequest("GET", api+"info", nil)
 	r.RemoteAddr = "127.0.0.1:1000"
-	r.Header.Set("Ugreen-User-ID", "private-user-id")
 	r.Header.Set("Ugreen-User-Name", "private-user-name")
 	r.Header.Set("Ugreen-Ttk", "private-token")
+	r.Header.Set("Ugreen-User-Type", "admin")
 	w := httptest.NewRecorder()
 	a.handler().ServeHTTP(w, r)
-	if w.Code != 503 {
-		t.Fatalf("status %d", w.Code)
+	if w.Code != 401 {
+		t.Fatalf("role or token accepted as identity: %d", w.Code)
 	}
 	var result struct {
-		Code       string         `json:"code"`
-		Diagnostic map[string]any `json:"diagnostic"`
+		Code       string
+		Diagnostic map[string]any
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Code != "UGOS_ROLE_UNAVAILABLE" || result.Diagnostic["admin_group_available"] != false || result.Diagnostic["role_header_count"] != float64(0) {
-		t.Fatalf("invalid diagnostic: %s", w.Body)
+	if result.Code != "UGOS_IDENTITY_UNAVAILABLE" || result.Diagnostic["id_header_count"] != float64(0) {
+		t.Fatalf("invalid diagnostic: %s", w.Body.String())
 	}
-	for _, secret := range []string{"private-user-id", "private-user-name", "private-token"} {
+	for _, secret := range []string{"private-user-name", "private-token"} {
 		if strings.Contains(w.Body.String(), secret) {
 			t.Fatalf("diagnostic leaked %s", secret)
 		}

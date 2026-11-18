@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"embed"
@@ -30,12 +29,12 @@ import (
 var assets embed.FS
 
 const api = "/api/wol/v1/"
-const version = "0.5.1"
+const version = "0.5.2"
 
 type User struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	Role string `json:"role"`
+	Role string `json:"role,omitempty"`
 }
 type userContextKey struct{}
 
@@ -103,7 +102,6 @@ type App struct {
 	file           string
 	lastWake       time.Time
 	taskError      string
-	groupFile      string
 	networks       func() ([]Network, error)
 	send           func([]byte, Network, int) (int, error)
 }
@@ -118,7 +116,7 @@ func usableLANInterface(nic net.Interface) bool {
 		}
 	}
 	// Docker uses br- followed by a 12-digit hexadecimal network ID.
-	// Keep named LAN bridges (for example br-lan) available to administrators.
+	// Keep named LAN bridges (for example br-lan) available to NAS users.
 	if suffix := strings.TrimPrefix(nic.Name, "br-"); suffix != nic.Name && len(suffix) == 12 {
 		if _, err := hex.DecodeString(suffix); err == nil {
 			return false
@@ -229,7 +227,7 @@ func newApp(dir string) (*App, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	a := &App{file: filepath.Join(dir, "state.json"), groupFile: "/etc/group", networks: localNetworks, send: sendPacket, discover: discoverLAN, checkStatuses: checkDeviceStatuses,
+	a := &App{file: filepath.Join(dir, "state.json"), networks: localNetworks, send: sendPacket, discover: discoverLAN, checkStatuses: checkDeviceStatuses,
 		state: State{Devices: []Device{}, History: []Event{}}}
 	data, err := os.ReadFile(a.file)
 	if err == nil {
@@ -322,73 +320,19 @@ func (a *App) gatewayUser(w http.ResponseWriter, r *http.Request) (User, bool) {
 	for _, key := range []string{"Ugreen-User-ID", "Ugreen-User-Name"} {
 		if len(r.Header.Values(key)) != 1 || strings.TrimSpace(r.Header.Get(key)) == "" {
 			logIdentityFailure(r)
-			problem(w, 401, "无法确认 NAS 登录身份，请从 UGOS 桌面重新打开应用")
+			respond(w, 401, map[string]any{"error": "无法确认 NAS 登录身份，请从 UGOS 桌面重新打开应用", "code": "UGOS_IDENTITY_UNAVAILABLE", "diagnostic": map[string]any{"app_version": version, "id_header_count": len(r.Header.Values("Ugreen-User-ID")), "name_header_count": len(r.Header.Values("Ugreen-User-Name"))}})
 			return User{}, false
 		}
 	}
-	user := User{ID: r.Header.Get("Ugreen-User-ID"), Name: r.Header.Get("Ugreen-User-Name"), Role: r.Header.Get("Ugreen-User-Type")}
-	if len(user.ID) > 128 || strings.ContainsAny(user.ID, ", \t\r\n") || len(user.Name) > 256 {
+	// The trusted gateway authenticates ID/name. Some firmware does not provide
+	// a role header; this app allows authenticated NAS users and never infers an
+	// administrator role or reads host account files. Keep Role only for old logs.
+	user := User{ID: r.Header.Get("Ugreen-User-ID"), Name: r.Header.Get("Ugreen-User-Name")}
+	if len(user.ID) > 128 || strings.ContainsAny(user.ID, ", \t\r\n") || len(user.Name) > 256 || strings.ContainsAny(user.Name, "\r\n\x00") {
 		problem(w, 401, "NAS 登录身份无效，请重新登录")
 		return User{}, false
 	}
-	roles := r.Header.Values("Ugreen-User-Type")
-	if len(roles) > 1 || (len(roles) == 1 && strings.TrimSpace(user.Role) == "") {
-		problem(w, 401, "NAS 用户角色信息无效，请重新登录")
-		return User{}, false
-	}
-	if len(roles) == 0 {
-		// Some UGOS releases provide verified ID/name but omit the role.
-		// Require a separate server-side administrator membership check.
-		admin, err := a.localAdministrator(user.Name)
-		if err != nil {
-			respond(w, 503, map[string]any{"error": "该固件未提供用户角色，且应用隔离环境无法确认管理员身份，请联系开发者核对固件兼容性", "code": "UGOS_ROLE_UNAVAILABLE", "diagnostic": map[string]any{"app_version": version, "id_header_count": len(r.Header.Values("Ugreen-User-ID")), "name_header_count": len(r.Header.Values("Ugreen-User-Name")), "role_header_count": len(roles), "admin_group_available": false}})
-			return User{}, false
-		}
-		if admin {
-			user.Role = "admin"
-		}
-	}
-	if user.Role != "admin" {
-		problem(w, 403, "当前 NAS 用户没有权限，仅管理员可使用远程唤醒")
-		return User{}, false
-	}
 	return user, true
-}
-
-func (a *App) localAdministrator(name string) (bool, error) {
-	f, err := os.Open(a.groupFile)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(io.LimitReader(f, 1<<20))
-	found, member := false, false
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
-			continue
-		}
-		fields := strings.Split(line, ":")
-		if fields[0] != "admin" {
-			continue
-		}
-		if found || len(fields) != 4 {
-			return false, errors.New("invalid admin group record")
-		}
-		found = true
-		for _, entry := range strings.Split(fields[3], ",") {
-			if entry == name {
-				member = true
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-	if !found {
-		return false, errors.New("administrator group unavailable")
-	}
-	return member, nil
 }
 
 func (a *App) handler() http.Handler {

@@ -1,6 +1,6 @@
 spec_version: "2.1"
 app_id: com.local.wol
-version: "0.5.1"
+version: "0.5.2"
 support_arch:
   - amd64
   - arm64
@@ -13,7 +13,7 @@ start_cmd: "bin/wol --port=28089 --bind=127.0.0.1"
 port: 28089
 proxy_path: api/wol
 open_type: inner
-only_admin: true
+only_admin: false
 tag_types:
   - utility
 depend_fw_version: "1.13.0.0000"

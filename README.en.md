@@ -34,7 +34,7 @@ The comparison below assumes you already own a UGREEN NAS and want to wake local
 
 A bookmark saves typing a URL, but a standalone web service still has its own entry point and login state to manage. Some web solutions can also run on a NAS. ugos-wol brings installation, authentication, and remote access into UGOS, so there is one less separate service to look after.
 
-These advantages assume a compatible UGREEN NAS that remains running and is already accessible through UGREEN remote access. The app currently requires a NAS administrator account. All WOL approaches require the target device to support and have the relevant wake-up functionality enabled. The NAS sending interface and target NIC must be in the same broadcast domain. If an existing router or overlay network setup already meets your needs, you can continue using it without duplicating that setup.
+These advantages assume a compatible UGREEN NAS that remains running and is already accessible through UGREEN remote access. The app requires a signed-in NAS account. All WOL approaches require the target device to support and have the relevant wake-up functionality enabled. The NAS sending interface and target NIC must be in the same broadcast domain. If an existing router or overlay network setup already meets your needs, you can continue using it without duplicating that setup.
 
 “No additional network configuration” refers to the remote entry point for wake-up. The target device's WOL settings and subsequent remote desktop, SSH, or streaming connections must still be prepared separately. This app does not tunnel those connections.
 
@@ -48,7 +48,7 @@ These advantages assume a compatible UGREEN NAS that remains running and is alre
 - **Multiple interfaces and subnets:** broadcast through available LAN interfaces automatically, or select a specific sending interface.
 - **Remote access:** open the app through UGREEN remote access while the NAS sends packets locally.
 - **Device and history management:** save up to 32 devices and retain the latest 100 transmission records, including the acting user.
-- **UGOS identity integration:** use the current NAS administrator identity without another app account or password.
+- **UGOS identity integration:** use the current signed-in NAS identity without another app account or password.
 - **Native deployment:** a static Go backend with bundled frontend assets. No Docker or external icon service is required. The app currently provides a Chinese-language interface for desktop and mobile.
 
 ## Preview
@@ -73,7 +73,7 @@ Once the device wakes, connect using your configured remote desktop, SSH, manage
 | --- | --- |
 | NAS system | UGOS Pro with native UPK support; the package configuration declares a minimum firmware version of `1.13.0.0000` |
 | NAS architecture | Separate `amd64` and `arm64` builds; choose the `nasync` package matching your NAS architecture |
-| Account | NAS administrator; administrators on the same NAS share the device list and transmission history |
+| Account | A NAS account authenticated by the UGOS gateway; accounts that can access the app on the same NAS share devices, schedules and history, and can manage them and send wake requests |
 | Target device | NIC, firmware, and target power state must support wake-up using standard WOL magic packets |
 | Network | The NAS sending interface and target NIC must share an IPv4 broadcast domain |
 
@@ -84,7 +84,7 @@ Hardware validation currently focuses on amd64 NAS devices. ARM64 builds are sup
 ## Installation and use
 
 1. Manually install the UPK matching your NAS architecture in the UGOS App Center. See [UGREEN's development preparation guide](https://developer.ugnas.com/doc/backend/quick-start/prepare.html) for authorization and signing requirements for self-developed packages.
-2. Sign in to the UGOS desktop or UGREEN client as an administrator, then open the app named “远程唤醒” (Remote Wake).
+2. Sign in to the UGOS desktop or UGREEN client with your NAS account, then open the app named “远程唤醒” (Remote Wake).
 3. Add a device manually, or switch to “局域网扫描” (LAN Scan), choose a NAS network, and scan. Select a result, review its name, MAC address, IP, and sending interface, then save. Manual entry defaults to using all available LAN interfaces automatically.
 4. Test local wake-up in a power state supported by the target device, then verify access through UGREEN remote access.
 
@@ -110,9 +110,9 @@ Occurrences missed while the NAS or app was stopped are skipped rather than repl
 
 ## Permissions and data
 
-The frontend obtains a login token through the official UGOS SDK, and the system gateway verifies the user's identity. The backend listens only on loopback, requires an authenticated administrator identity, and does not directly expose a service port to the LAN.
+The frontend obtains a login token through the official UGOS SDK, and the system gateway verifies the user's identity. The backend listens only on loopback, requires a user ID and username authenticated by the system gateway, and does not directly expose a service port to the LAN. Access no longer depends on the user role, the NAS administrator group file, or a local compatibility override.
 
-Device configuration, scheduled tasks and transmission history are stored in `state.json` in the application's data directory using atomic file replacement. This data is shared by administrators on the same NAS. Uninstallation removes the application data directory; back up this file first if you want to retain your configuration.
+Device configuration, scheduled tasks and transmission history are stored in `state.json` in the application's data directory using atomic file replacement. This data is shared by signed-in accounts that can access the app on the same NAS. Those accounts can view, add, edit and delete devices and schedules, and send wake requests; the app does not provide a separate private device list for each account. Uninstallation removes the application data directory; back up this file first if you want to retain your configuration.
 
 ## Build from source
 
@@ -158,7 +158,7 @@ docs/          Device setup, compatibility, validation, and third-party notices
 
 ## Development and feedback
 
-After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Asset filenames are fingerprinted from their contents, and matching gzip copies are generated together to prevent stale compressed assets after an upgrade. UI icons embed local library SVG geometry directly in HTML and JavaScript, without external sprite references. The build generates `frontend/icon-data.js`. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, administrator permissions, and desktop/mobile behavior.
+After editing the frontend, run its build to synchronize `backend/web/` and `packaging/rootfs_common/www/`. Asset filenames are fingerprinted from their contents, and matching gzip copies are generated together to prevent stale compressed assets after an upgrade. UI icons embed local library SVG geometry directly in HTML and JavaScript, without external sprite references. The build generates `frontend/icon-data.js`. Backend changes should pass `go test ./...`. Device management and authentication changes should also be checked for existing configuration compatibility, login authentication, and desktop/mobile behavior.
 
 Run the offline packaging selection, export, and overwrite-protection checks with Python 3: `python3 scripts/tests/test_packaging.py`. These checks create only temporary fixtures; they do not invoke the real packaging tool or generate release packages.
 

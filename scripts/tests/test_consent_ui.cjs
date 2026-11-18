@@ -20,7 +20,7 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
  try{
   const page=await browser.newPage({viewport:{width:1440,height:960}});page.on('pageerror',e=>errors.push(e.message));await page.route('**/icons*.svg*',route=>route.abort());
   const network={id:'eth0/192.168.1.0/24',name:'eth0',ip:'192.168.1.2',cidr:'192.168.1.0/24',broadcast:'192.168.1.255'};
-  const info={version:'0.5.1',devices:[{id:'pc',name:'办公电脑',mac:'02:11:22:33:44:55',network:'auto'}],tasks:[],history:[],networks:[network],default_timezone:'Asia/Shanghai',server_time:new Date().toISOString()};
+  const info={version:'0.5.2',devices:[{id:'pc',name:'办公电脑',mac:'02:11:22:33:44:55',network:'auto'}],tasks:[],history:[],networks:[network],default_timezone:'Asia/Shanghai',server_time:new Date().toISOString()};
   let posted,mode='normal',serial=0,wakes=0,apiRequests=0;
   const inputFor=body=>({...body,name:body.name||'办公电脑定时唤醒',date:body.repeat==='once'?body.date:undefined,weekdays:{daily:[1,2,3,4,5,6,7],weekdays:[1,2,3,4,5],weekends:[6,7]}[body.repeat]||body.weekdays});
   await page.route('**/api/wol/v1/**',async route=>{
@@ -75,9 +75,9 @@ const {build}=require(path.join(repo,'frontend/node_modules/esbuild'));
   const beforeLateToken=apiRequests;await frame.evaluate(()=>window.releaseToken());await page.waitForTimeout(150);assert.equal(apiRequests,beforeLateToken);assert(await f.locator('#app').isHidden());
   await frame.evaluate(()=>{window.delayToken=false;});checks.push('A delayed SDK token returned after withdrawal cannot start an API request');
   // Confirm the compatibility error is exportable and excludes user values/tokens.
-  await page.route('**/api/wol/v1/info',r=>r.fulfill({status:503,json:{error:'无法确认管理员角色',code:'UGOS_ROLE_UNAVAILABLE',diagnostic:{role_header_count:0,admin_group_available:false}}}));
-  await f.locator('#retry-session').click();await f.locator('#consent-check').check();await f.locator('#consent-accept').click();await f.locator('#session-message').filter({hasText:'无法确认管理员角色'}).waitFor();await f.locator('#download-diagnostic').waitFor({state:'visible'});
-  const [download]=await Promise.all([page.waitForEvent('download'),f.locator('#download-diagnostic').click()]);const diagnostic=JSON.parse(fs.readFileSync(await download.path(),'utf8'));assert.equal(diagnostic.code,'UGOS_ROLE_UNAVAILABLE');assert.equal(diagnostic.details.admin_group_available,false);assert(!JSON.stringify(diagnostic).includes('fixture-token'));checks.push('Firmware compatibility errors can be downloaded as a diagnostic JSON without tokens');
+  await page.route('**/api/wol/v1/info',r=>r.fulfill({status:401,json:{error:'无法确认NAS登录身份',code:'UGOS_IDENTITY_UNAVAILABLE',diagnostic:{id_header_count:0,name_header_count:1}}}));
+  await f.locator('#retry-session').click();await f.locator('#consent-check').check();await f.locator('#consent-accept').click();await f.locator('#session-message').filter({hasText:'无法确认NAS登录身份'}).waitFor();await f.locator('#download-diagnostic').waitFor({state:'visible'});
+  const [download]=await Promise.all([page.waitForEvent('download'),f.locator('#download-diagnostic').click()]);const diagnostic=JSON.parse(fs.readFileSync(await download.path(),'utf8'));assert.equal(diagnostic.code,'UGOS_IDENTITY_UNAVAILABLE');assert.equal(diagnostic.details.id_header_count,0);assert(!JSON.stringify(diagnostic).includes('fixture-token'));checks.push('Firmware compatibility errors can be downloaded as a diagnostic JSON without tokens');
   await frame.evaluate(()=>document.getElementById('consent-dialog').showModal());await f.locator('#consent-decline').click();await page.setViewportSize({width:320,height:700});await f.locator('#retry-session').click();assert(await frame.evaluate(()=>{const e=document.getElementById('consent-dialog'),r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.scrollWidth<=e.clientWidth}));await page.screenshot({path:path.join(repo,'docs/assets/consent-mobile.png')});checks.push('Consent and legal links fit a 320px mobile viewport');
   const outdated=await browser.newPage();let outdatedRequests=0;
   await outdated.addInitScript(()=>localStorage.setItem('ugos-wol-consent',JSON.stringify({version:'old-policy',accepted:true})));

@@ -1,4 +1,4 @@
-export const POLICY_VERSION='2026-11-17';
+export const POLICY_VERSION='2026-11-18';
 const KEY='ugos-wol-consent';
 let memory=false,reviewing=false;
 const $=id=>document.getElementById(id);

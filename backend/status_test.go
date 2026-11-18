@@ -47,7 +47,7 @@ func TestOptionalIPAndSystemPersistAndLegacyStillWakes(t *testing.T) {
 	}
 }
 
-func TestStatusRequiresAdminAndCachesOnlyMatchingConfiguration(t *testing.T) {
+func TestStatusRequiresIdentityAndCachesOnlyMatchingConfiguration(t *testing.T) {
 	a := fixture(t)
 	d := add(t, a)
 	calls := 0
@@ -61,7 +61,7 @@ func TestStatusRequiresAdminAndCachesOnlyMatchingConfiguration(t *testing.T) {
 	for _, tc := range []struct {
 		who, body string
 		want      int
-	}{{"", `{}`, 401}, {"users", `{}`, 403}, {"admin", `{"ip":"8.8.8.8"}`, 400}} {
+	}{{"", `{}`, 401}, {"admin", `{"ip":"8.8.8.8"}`, 400}} {
 		if code, _ := call(t, a, "POST", "status", tc.body, tc.who); code != tc.want {
 			t.Fatal(code, tc.want)
 		}
@@ -71,7 +71,7 @@ func TestStatusRequiresAdminAndCachesOnlyMatchingConfiguration(t *testing.T) {
 	}
 	before, _ := os.ReadFile(a.file)
 	for i := 0; i < 2; i++ {
-		if code, _ := call(t, a, "POST", "status", `{}`, "admin"); code != 200 {
+		if code, _ := call(t, a, "POST", "status", `{}`, "users"); code != 200 {
 			t.Fatal(code)
 		}
 	}

@@ -70,10 +70,10 @@ func TestTaskValidationAndAuthorization(t *testing.T) {
 	a := fixture(t)
 	d := add(t, a)
 	valid := TaskInput{Name: "工作日唤醒", DeviceID: d.ID, Repeat: "weekdays", Time: "08:30", Timezone: "Asia/Shanghai", Enabled: true}
-	for _, who := range []string{"", "users"} {
+	for _, who := range []string{""} {
 		body, _ := json.Marshal(valid)
 		code, _ := call(t, a, "POST", "tasks", string(body), who)
-		if (who == "" && code != 401) || (who == "users" && code != 403) {
+		if who == "" && code != 401 {
 			t.Fatal(code)
 		}
 	}

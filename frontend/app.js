@@ -111,7 +111,7 @@ function refreshStatuses() {
   return statusPromise;
 }
 function sessionFailed(error) {
-  lastDiagnostic={application:'ugos-wol',version:'0.5.1',time:new Date().toISOString(),status:error.status||null,code:error.code||'SESSION_FAILED',message:error.message,details:error.diagnostic||null};
+  lastDiagnostic={application:'ugos-wol',version:'0.5.2',time:new Date().toISOString(),status:error.status||null,code:error.code||'SESSION_FAILED',message:error.message,details:error.diagnostic||null};
   $('download-diagnostic').hidden=false;
   connected = false; thirdToken = '';
   wakeWatches.clear(); deviceStatuses.clear();
