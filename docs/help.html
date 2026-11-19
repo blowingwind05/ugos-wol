@@ -17,7 +17,7 @@
 <h1>使用帮助</h1>
 <p class="doc-lead">「远程唤醒」让一台正在运行的绿联 NAS 为局域网内的其他设备发送 Wake-on-LAN（WOL）唤醒包。你可以在家里先测试一次，再通过绿联远程访问从外面发起唤醒。</p>
 <nav class="doc-index" aria-label="本页目录">
-<a href="#start">安装与设置</a>
+<a href="#start">首次设置</a>
 <a href="#devices">设备和 IP</a>
 <a href="#remote">远程访问</a>
 <a href="#schedule">定时任务</a>
@@ -26,8 +26,7 @@
 </nav>
 
 <section aria-labelledby="start">
-<h2 id="start">安装与设置</h2>
-<p>请由 NAS 管理员在应用中心安装与 NAS 架构匹配的 UPK。安装后登录绿联客户端或 UGOS 网页桌面，从应用列表打开「远程唤醒」。应用也有内置「帮助」，可以直接查看当前 NAS 的发送接口。</p>
+<h2 id="start">首次设置</h2>
 <ol class="setup-steps" role="list">
 <li><span class="step-number" aria-hidden="true">1</span><strong>开启目标设备的 WOL</strong><p>在 BIOS、UEFI、网卡或设备管理界面开启网络唤醒。先从设备支持的电源状态测试，例如睡眠。</p></li>
 <li><span class="step-number" aria-hidden="true">2</span><strong>添加设备</strong><p>在「设备列表 → 添加设备」填入名称和网卡 MAC。只用唤醒的话，IP 留空。</p></li>
@@ -90,7 +89,7 @@
 <h3>到了时间任务没有唤醒</h3>
 <p>在任务卡片核对开关、时区、频率和下次执行时间。若任务已运行，打开「发送记录」查发包结果。发送成功但设备没起时，按上面的唤醒步骤排查；没有记录时，确认当时 NAS 和应用都在运行。</p>
 <h3>打不开应用</h3>
-<p>确认已登录绿联客户端或 UGOS 网页桌面，再从应用列表重新打开。若错误页提供「下载诊断信息」，可以将诊断文件和复现步骤发给<a href="support.html">技术支持</a>。同时附上应用和 UGOS 版本、NAS 型号与使用入口，提交前遮盖个人信息和登录令牌。</p>
+<p>如果页面提示无法验证登录身份，关闭窗口后重新打开应用。若错误页提供「下载诊断信息」，可以将诊断文件和复现步骤发给<a href="support.html">技术支持</a>。同时附上应用和 UGOS 版本、NAS 型号与使用入口，提交前遮盖个人信息和登录令牌。</p>
 </section>
 
 <section aria-labelledby="data">
