@@ -1,23 +1,98 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>使用帮助 · 远程唤醒</title><link rel="stylesheet" href="legal.css"></head><body><main><nav><a href="about.html">应用介绍</a><a href="help.html">帮助</a><a href="privacy.html">隐私政策</a><a href="agreement.html">许可协议</a><a href="permissions.html">权限说明</a><a href="support.html">支持</a></nav><h1>使用帮助</h1>
-<p>第一次配置时，打开应用里的「设置指南」，按步骤启用 WOL、添加设备并在局域网里试一次。这里可以查安装、在线状态、定时任务和常见问题。</p>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>使用帮助 · 远程唤醒</title>
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+<nav aria-label="站点导航">
+<a href="about.html">应用介绍</a>
+<a href="help.html" aria-current="page">帮助</a>
+<a href="support.html">技术支持</a>
+</nav>
+<h1>使用帮助</h1>
+<p>「远程唤醒」让一台正在运行的绿联 NAS 为局域网内的其他设备发送 Wake-on-LAN（WOL）唤醒包。你可以在家里先测试一次，再通过绿联远程访问从外面发起唤醒。</p>
+<nav aria-label="本页目录">
+<a href="#start">安装与设置</a>
+<a href="#devices">设备和 IP</a>
+<a href="#remote">远程访问</a>
+<a href="#schedule">定时任务</a>
+<a href="#troubleshoot">常见问题</a>
+<a href="#data">数据与卸载</a>
+</nav>
 
-<h2>安装与打开</h2>
-<p>请由 NAS 管理员安装与设备架构匹配的 UPK。安装后，登录绿联客户端或 UGOS 网页桌面，从应用列表打开「远程唤醒」。</p>
+<section aria-labelledby="start">
+<h2 id="start">安装与设置</h2>
+<p>请由 NAS 管理员在应用中心安装与 NAS 架构匹配的 UPK。安装后登录绿联客户端或 UGOS 网页桌面，从应用列表打开「远程唤醒」。应用也有内置「帮助」，可以直接查看当前 NAS 的发送接口。</p>
+<ol>
+<li><strong>开启目标设备的 WOL。</strong> 在 BIOS、UEFI、网卡或设备管理界面中开启网络唤醒。先从设备明确支持的电源状态测试，例如睡眠。关机后能否唤醒取决于硬件、固件、驱动和网卡是否仍有电。</li>
+<li><strong>添加设备。</strong> 记录用于唤醒的真实网卡 MAC。在「设备列表 → 添加设备」填入名称和 MAC。只用唤醒的话，IP 留空即可。NAS 和目标网卡通常需要在同一广播域内。</li>
+<li><strong>在局域网测试一次。</strong> 让设备进入支持唤醒的状态，点击「唤醒」，观察它是否启动。如果 NAS 有多个网口，可以在应用内「帮助 → NAS 当前网络」查找对应接口。</li>
+</ol>
 
-<h2>添加设备</h2>
-<p>填入设备名称和支持 WOL 的网卡 MAC 地址。也可以先让目标设备开机联网，再用局域网扫描查找。经过无线中继时，扫描到的 MAC 可能是中继器的地址，请以目标设备上查到的网卡 MAC 为准。</p>
+<h3>按系统查找网卡 MAC</h3>
+<dl>
+<dt><strong>Windows</strong></dt><dd><p>在 PowerShell 执行 <code>Get-NetAdapter | Select Name,MacAddress,Status</code>，找到实际用于唤醒的网卡。在固件和网卡属性中查看网络唤醒或「魔术封包唤醒」选项。</p></dd>
+<dt><strong>Linux</strong></dt><dd><p>执行 <code>ip -br link</code> 查看接口和 MAC。根据网卡驱动和发行版的网络管理工具确认魔术包唤醒设置。</p></dd>
+<dt><strong>macOS</strong></dt><dd><p>执行 <code>networksetup -listallhardwareports</code> 查看硬件端口和 MAC。「唤醒以供网络访问」取决于机型、网卡和电源条件，请以实测为准。</p></dd>
+</dl>
+<p>服务器、其他 NAS 和网络设备可从管理界面或厂商文档确认支持情况。多网卡设备请核对实际联网的物理接口。无线网卡、USB 网卡和扩展坞能否唤醒取决于设备支持。</p>
+</section>
 
-<h2>唤醒与在线状态</h2>
-<p><strong>只想唤醒设备，IP 留空即可。</strong> 唤醒包按 MAC 地址发送。IP 只用于状态检测。</p>
-<p>IP 留空时，NAS 会尝试按 MAC 查找设备地址。自动查找不到时，可以填写设备当前的局域网 IPv4 地址。地址变了，改成新地址或清空即可。</p>
-<p>「已发送」表示 NAS 发出了唤醒包。能否上线取决于目标设备和网络设置。可点击状态查看检测详情。休眠、防火墙或无线中继都可能影响结果。</p>
+<section aria-labelledby="devices">
+<h2 id="devices">设备、IP 和在线状态</h2>
+<h3>手动添加、扫描或复制</h3>
+<p>手动添加时填写名称和网卡 MAC。系统类型选填，用于显示设备图标。发送接口默认是「自动」，会使用所有可用局域网接口。遇到多网口或多网段环境，可指定与目标网卡位于同一广播域的接口。</p>
+<p>扫描前先开机并让目标设备连上局域网。选择 NAS 对应的网段，点击「扫描」，再选中一条结果带入表单。结果可能来自邻居缓存，名称也可能查不到，可以核对后手动更改。网段大于 /24 时，只探测 NAS 所在的 /24 范围，以界面显示的范围为准。</p>
+<p>如果多个 IP 显示同一个 MAC，无线中继或路由器可能在代答。唤醒请使用目标设备上查到的真实网卡 MAC，扫描结果中的 IP 仍可用于状态检测。</p>
+<p>设备卡片菜单可编辑、复制或删除配置。点击「复制设备」会立即新增一条配置，保留 MAC、IP、系统和发送接口，可再按需编辑。原设备的定时任务和发送记录继续归原设备。</p>
 
-<h2>定时任务</h2>
-<p>选择设备、频率和时间。时间可以直接输入，也可以从选择器选取。时区可在「更多设置」里修改。页面关掉后，已启用的任务仍由 NAS 执行。NAS 或应用停用期间错过的任务会跳过。</p>
+<h3>IP 只用于状态检测</h3>
+<p><strong>只想唤醒设备，IP 留空即可。</strong> WOL 用 MAC 发送唤醒包。IP 留空时，NAS 会尝试按 MAC 查找目标设备的地址。找不到地址会显示「状态未知」，仍可照常尝试唤醒。</p>
+<p>需要指定检测地址时，填目标设备当前的局域网 IPv4。地址变化后，更新或清空这一栏。手填 IP 后，在线表示该地址有网络响应。如果地址已被另一台设备使用，检测结果也会跟着那个地址。</p>
+<ul>
+<li><strong>在线</strong>：NAS 收到了网络响应。远程桌面或串流服务可能还在启动。</li>
+<li><strong>未响应</strong>：NAS 没有探测到响应。检查目标是否已启动、防火墙是否拦截，以及网络是否可达。</li>
+<li><strong>状态未知</strong>：当前无法确认地址或完成检测。点击状态可查看具体原因和检测时间。</li>
+</ul>
+</section>
 
-<h2>打不开应用</h2>
-<p>先确认 NAS 已登录，并从 UGOS 桌面或绿联客户端重新打开应用。如果仍出错，可在应用的错误页下载诊断信息，再通过<a href="support.html">技术支持</a>反馈。</p>
+<section aria-labelledby="remote">
+<h2 id="remote">在外网唤醒</h2>
+<p>局域网测试成功后，从已配置好的绿联远程访问入口打开 NAS 上的「远程唤醒」，点击目标设备。NAS 在家里的局域网发包，需要保持运行。如果 NAS 已关机，需要先通过其他方式让 NAS 开机。</p>
+<p>设备启动后，再通过平时使用的远程桌面、设备管理工具或串流软件连接。请先配置这些软件自己的连接方式。</p>
+</section>
 
-<h2>数据与卸载</h2>
-<p>同一台 NAS 上能打开本应用的账号共享设备、任务和发送记录。删除设备前请先删除关联任务。卸载会删除应用保存的数据。</p>
-</main></body></html>
+<section aria-labelledby="schedule">
+<h2 id="schedule">定时任务</h2>
+<ol>
+<li>进入「定时任务 → 新建任务」，选择设备和频率。支持每天、工作日、周末、自定义星期和仅一次。</li>
+<li>选择或直接输入时间。仅一次任务还需选择日期。「更多设置」可以更改名称和时区。</li>
+<li>保存并启用后，检查任务卡片里的下次执行时间。工作日按周一到周五，周末按周六和周日，节假日调休需要手动处理。</li>
+</ol>
+<p>关闭页面后，已启用的任务由 NAS 后台执行。NAS 或应用停用期间错过的任务会跳过。要暂停可以关闭任务开关。删设备前，请先删除关联的任务。</p>
+</section>
+
+<section aria-labelledby="troubleshoot">
+<h2 id="troubleshoot">常见问题</h2>
+<h3>显示「已发送」，设备没有启动</h3>
+<p>「已发送」说明 NAS 发出了包。请依次核对目标网卡 MAC、目标电源状态、网卡待机供电和 NAS 选择的发送接口。访客网络、AP 隔离、不同 VLAN 或无线中继可能挡住广播。建议先让 NAS 和设备接到同一局域网测试。</p>
+<h3>扫描找不到设备</h3>
+<p>确认设备开机联网，并选择与它相连的 NAS 网段。查看弹出的实际扫描范围。仍然找不到时，可到目标设备上查询网卡 MAC 后手动添加。</p>
+<h3>到了时间任务没有唤醒</h3>
+<p>在任务卡片核对开关、时区、频率和下次执行时间。若任务已运行，打开「发送记录」查发包结果。发送成功但设备没起时，按上面的唤醒步骤排查；没有记录时，确认当时 NAS 和应用都在运行。</p>
+<h3>打不开应用</h3>
+<p>确认已登录绿联客户端或 UGOS 网页桌面，再从应用列表重新打开。若错误页提供「下载诊断信息」，可以将诊断文件和复现步骤发给<a href="support.html">技术支持</a>。同时附上应用和 UGOS 版本、NAS 型号与使用入口，提交前遮盖个人信息和登录令牌。</p>
+</section>
+
+<section aria-labelledby="data">
+<h2 id="data">数据与卸载</h2>
+<p>同一台 NAS 上能打开本应用的账号共享设备、任务和发送记录，这些数据保存在 NAS 上。发送记录保留最近 100 条。卸载会删除本应用保存的数据，重要配置请提前保存。详见<a href="privacy.html">隐私与数据</a>。</p>
+</section>
+</main>
+</body>
+</html>
