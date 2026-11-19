@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>使用帮助 · 远程唤醒</title>
-<link rel="stylesheet" href="legal.css">
+<link rel="stylesheet" href="legal.css?v=3">
 </head>
 <body>
 <main>
@@ -15,8 +15,8 @@
 <a href="support.html">技术支持</a>
 </nav>
 <h1>使用帮助</h1>
-<p>「远程唤醒」让一台正在运行的绿联 NAS 为局域网内的其他设备发送 Wake-on-LAN（WOL）唤醒包。你可以在家里先测试一次，再通过绿联远程访问从外面发起唤醒。</p>
-<nav aria-label="本页目录">
+<p class="doc-lead">「远程唤醒」让一台正在运行的绿联 NAS 为局域网内的其他设备发送 Wake-on-LAN（WOL）唤醒包。你可以在家里先测试一次，再通过绿联远程访问从外面发起唤醒。</p>
+<nav class="doc-index" aria-label="本页目录">
 <a href="#start">安装与设置</a>
 <a href="#devices">设备和 IP</a>
 <a href="#remote">远程访问</a>
@@ -28,17 +28,21 @@
 <section aria-labelledby="start">
 <h2 id="start">安装与设置</h2>
 <p>请由 NAS 管理员在应用中心安装与 NAS 架构匹配的 UPK。安装后登录绿联客户端或 UGOS 网页桌面，从应用列表打开「远程唤醒」。应用也有内置「帮助」，可以直接查看当前 NAS 的发送接口。</p>
-<ol>
-<li><strong>开启目标设备的 WOL。</strong> 在 BIOS、UEFI、网卡或设备管理界面中开启网络唤醒。先从设备明确支持的电源状态测试，例如睡眠。关机后能否唤醒取决于硬件、固件、驱动和网卡是否仍有电。</li>
-<li><strong>添加设备。</strong> 记录用于唤醒的真实网卡 MAC。在「设备列表 → 添加设备」填入名称和 MAC。只用唤醒的话，IP 留空即可。NAS 和目标网卡通常需要在同一广播域内。</li>
-<li><strong>在局域网测试一次。</strong> 让设备进入支持唤醒的状态，点击「唤醒」，观察它是否启动。如果 NAS 有多个网口，可以在应用内「帮助 → NAS 当前网络」查找对应接口。</li>
+<ol class="setup-steps" role="list">
+<li><span class="step-number" aria-hidden="true">1</span><strong>开启目标设备的 WOL</strong><p>在 BIOS、UEFI、网卡或设备管理界面开启网络唤醒。先从设备支持的电源状态测试，例如睡眠。</p></li>
+<li><span class="step-number" aria-hidden="true">2</span><strong>添加设备</strong><p>在「设备列表 → 添加设备」填入名称和网卡 MAC。只用唤醒的话，IP 留空。</p></li>
+<li><span class="step-number" aria-hidden="true">3</span><strong>在局域网测试</strong><p>让目标进入可唤醒的状态，再点「唤醒」。多网口的 NAS 可从「帮助 → NAS 当前网络」查发送接口。</p></li>
 </ol>
+<p>NAS 和目标网卡通常需要在同一广播域内。关机后能否唤醒取决于硬件、固件、驱动和网卡是否仍有电。</p>
 
 <h3>按系统查找网卡 MAC</h3>
-<dl>
-<dt><strong>Windows</strong></dt><dd><p>在 PowerShell 执行 <code>Get-NetAdapter | Select Name,MacAddress,Status</code>，找到实际用于唤醒的网卡。在固件和网卡属性中查看网络唤醒或「魔术封包唤醒」选项。</p></dd>
-<dt><strong>Linux</strong></dt><dd><p>执行 <code>ip -br link</code> 查看接口和 MAC。根据网卡驱动和发行版的网络管理工具确认魔术包唤醒设置。</p></dd>
-<dt><strong>macOS</strong></dt><dd><p>执行 <code>networksetup -listallhardwareports</code> 查看硬件端口和 MAC。「唤醒以供网络访问」取决于机型、网卡和电源条件，请以实测为准。</p></dd>
+<dl class="command-list">
+<dt>Windows</dt>
+<dd><p>在 PowerShell 找到实际用于唤醒的网卡，再到固件和网卡属性中查看网络唤醒或「魔术封包唤醒」。</p><pre><code>Get-NetAdapter | Select Name,MacAddress,Status</code></pre></dd>
+<dt>Linux</dt>
+<dd><p>查看接口和 MAC，再按网卡驱动或发行版的网络管理工具设置魔术包唤醒。</p><pre><code>ip -br link</code></pre></dd>
+<dt>macOS</dt>
+<dd><p>查看硬件端口和 MAC。「唤醒以供网络访问」取决于机型、网卡和电源条件，请以实测为准。</p><pre><code>networksetup -listallhardwareports</code></pre></dd>
 </dl>
 <p>服务器、其他 NAS 和网络设备可从管理界面或厂商文档确认支持情况。多网卡设备请核对实际联网的物理接口。无线网卡、USB 网卡和扩展坞能否唤醒取决于设备支持。</p>
 </section>
@@ -52,13 +56,13 @@
 <p>设备卡片菜单可编辑、复制或删除配置。点击「复制设备」会立即新增一条配置，保留 MAC、IP、系统和发送接口，可再按需编辑。原设备的定时任务和发送记录继续归原设备。</p>
 
 <h3>IP 只用于状态检测</h3>
-<p><strong>只想唤醒设备，IP 留空即可。</strong> WOL 用 MAC 发送唤醒包。IP 留空时，NAS 会尝试按 MAC 查找目标设备的地址。找不到地址会显示「状态未知」，仍可照常尝试唤醒。</p>
+<p class="note"><strong>只想唤醒设备，IP 留空即可。</strong> WOL 用 MAC 发送唤醒包。IP 留空时，NAS 会尝试按 MAC 查找目标设备的地址。找不到地址会显示「状态未知」，仍可照常尝试唤醒。</p>
 <p>需要指定检测地址时，填目标设备当前的局域网 IPv4。地址变化后，更新或清空这一栏。手填 IP 后，在线表示该地址有网络响应。如果地址已被另一台设备使用，检测结果也会跟着那个地址。</p>
-<ul>
-<li><strong>在线</strong>：NAS 收到了网络响应。远程桌面或串流服务可能还在启动。</li>
-<li><strong>未响应</strong>：NAS 没有探测到响应。检查目标是否已启动、防火墙是否拦截，以及网络是否可达。</li>
-<li><strong>状态未知</strong>：当前无法确认地址或完成检测。点击状态可查看具体原因和检测时间。</li>
-</ul>
+<dl class="status-key">
+<div><dt><span class="status-dot online" aria-hidden="true"></span>在线</dt><dd>NAS 收到了网络响应。远程桌面或串流服务可能还在启动。</dd></div>
+<div><dt><span class="status-dot unresponsive" aria-hidden="true"></span>未响应</dt><dd>NAS 没有探测到响应。检查目标是否已启动、防火墙是否拦截，以及网络是否可达。</dd></div>
+<div><dt><span class="status-dot" aria-hidden="true"></span>状态未知</dt><dd>当前无法确认地址或完成检测。点击状态可查看具体原因和检测时间。</dd></div>
+</dl>
 </section>
 
 <section aria-labelledby="remote">
